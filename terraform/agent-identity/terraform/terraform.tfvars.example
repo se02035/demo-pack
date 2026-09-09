@@ -1,0 +1,20 @@
+# Copy to terraform.tfvars (gitignored) and fill in. Do not commit real project values.
+# org_id is required because data.google_project.org_id is empty on folder-parented projects.
+
+project_id = "YOUR_GCP_PROJECT_ID"
+org_id     = "YOUR_ORG_ID"
+region     = "us-central1"
+
+# Concept 1: leave code/Cloud Run flags false, then `terraform apply`.
+# Concept 2: set both true, then `terraform apply`. Leave them true afterwards.
+# Concept 3a: enable_principalset_agents = true (after concept 2).
+# Concept 3b: enable_principalset_mutate = true (after 3a).
+# Destroy: same flags as the last apply (see README). Wrapper: ./destroy.sh
+enable_agent_runtime_code  = false
+enable_cloud_run           = false
+enable_principalset_agents = false
+enable_principalset_mutate = false
+
+# Optional. After Cloud Build publishes the ADK image, set the first Cloud Run
+# service to terraform output -raw adk_image_uri (built from project_id).
+# cloud_run_image = "REGION-docker.pkg.dev/YOUR_GCP_PROJECT_ID/tf-agentid/hello-adk:latest"
