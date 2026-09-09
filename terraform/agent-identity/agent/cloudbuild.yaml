@@ -1,0 +1,14 @@
+steps:
+  - name: gcr.io/cloud-builders/docker
+    args:
+      - build
+      - -t
+      - ${_IMAGE}
+      - .
+images:
+  - ${_IMAGE}
+substitutions:
+  # Pass the real URI from Terraform: --substitutions=_IMAGE="$(terraform output -raw adk_image_uri)"
+  _IMAGE: REGION-docker.pkg.dev/PROJECT/tf-agentid/hello-adk:latest
+options:
+  logging: CLOUD_LOGGING_ONLY
