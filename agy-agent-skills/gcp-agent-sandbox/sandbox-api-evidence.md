@@ -71,7 +71,7 @@ Delete order: sandboxes → templates → engine.
 
 ## CLI SDK rewrite (2026-09-10)
 
-`scripts/sandbox.py` is argparse over `agentplatform.Client` (`api_version=v1`),
+`gcp-agent-sandbox` is argparse over `agentplatform.Client` (`api_version=v1`),
 not stdlib REST. Unit tests mock the Client (no live GCP).
 
 CLI re-smoke (this section): code create + `execute_code` in `us-central1` and

@@ -2,14 +2,14 @@
 name: gcp-agent-sandbox-exec
 description: >-
   Execute Python via execute_code and bash via execute_bash in Gemini Enterprise
-  Agent Platform sandboxes using scripts/sandbox.py (agentplatform.Client v1).
-  Code exec works in us-central1 and europe-west4. Bash requires a RUNNING shell
-  sandbox (US today; EU shell templates fail). Use when the user asks to run
-  code or a shell command inside an Agent Platform sandbox.
+  Agent Platform sandboxes using the gcp-agent-sandbox CLI (agentplatform.Client
+  v1). Code exec works in us-central1 and europe-west4. Bash requires a RUNNING
+  shell sandbox (US today; EU shell templates fail). Use when the user asks to
+  run code or a shell command inside an Agent Platform sandbox.
 license: Apache-2.0
 compatibility: >-
-  Python 3.10+, pip install -r ../requirements.txt
-  (google-cloud-aiplatform[agent_engines]>=2.1.0), gcloud ADC, network to
+  Python 3.10+, the gcp-agent-sandbox CLI
+  (`python3 -m pip install -e <path-to-the-suite>`), gcloud ADC, network to
   {location}-aiplatform.googleapis.com. There is no gcloud sandbox CLI.
 metadata:
   version: "1.0"
@@ -18,12 +18,18 @@ metadata:
 # GCP Agent Platform sandbox exec
 
 Run **Python** (`exec code`) or **bash** (`exec bash`) in an existing sandbox.
-Prefer this skill’s shim over inventing curl. Before any call, apply
-[../gcp-agent-sandbox-crud/references/limitations.md](../gcp-agent-sandbox-crud/references/limitations.md)
-(CRUD-6, CRUD-8, CRUD-9).
+Prefer **`gcp-agent-sandbox`** over inventing curl. Before any call, apply
+[references/limitations.md](references/limitations.md) (CRUD-6, CRUD-8, CRUD-9).
 
 Create sandboxes with **gcp-agent-sandbox-crud** first. Reuse the engine/sandbox
 name from this conversation.
+
+## CLI required
+
+1. Run `gcp-agent-sandbox help exec`, or `python3 -m gcp_agent_sandbox help exec`.
+2. If both fail, **stop**. Do not call GCP. Do not invent curl. Tell the user to
+   `python3 -m pip install -e /path/to/demo-pack/agy-agent-skills/gcp-agent-sandbox`
+   using the same Python as this harness.
 
 ## Hard rules
 
@@ -35,12 +41,14 @@ name from this conversation.
 - `help` first if flags are unclear (no Client/ADC).
 
 ```bash
-python3 scripts/sandbox.py help exec
-python3 scripts/sandbox.py --project PROJECT_ID --location LOCATION \
+gcp-agent-sandbox help exec
+gcp-agent-sandbox --project PROJECT_ID --location LOCATION \
   exec code SANDBOX --engine ENGINE --code 'print(2+2)'
-python3 scripts/sandbox.py --project PROJECT_ID --location LOCATION \
+gcp-agent-sandbox --project PROJECT_ID --location LOCATION \
   exec bash SANDBOX --engine ENGINE --command 'echo ok && pwd'
 ```
+
+Fallback: `python3 -m gcp_agent_sandbox` with the same arguments.
 
 Non-zero `exit_status_int` / `returncode` is a failed **program**, not an RPC error.
 

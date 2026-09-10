@@ -1,4 +1,4 @@
-"""Unit tests for sandbox.py. Mocks agentplatform.Client; no live GCP."""
+"""Unit tests for gcp_agent_sandbox.cli. Mocks agentplatform.Client; no live GCP."""
 
 from __future__ import annotations
 
@@ -11,7 +11,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
-import sandbox
+import gcp_agent_sandbox.cli as sandbox
 
 
 def parse(*argv: str) -> argparse.Namespace:
@@ -57,6 +57,22 @@ def test_help_exits_zero_without_client(monkeypatch: pytest.MonkeyPatch, capsys:
     assert "crafty-progress" not in blob
     assert "149377925365" not in blob
     assert "@developer.gserviceaccount.com" not in blob
+    assert "scripts/sandbox.py" not in blob
+    assert "gcp-agent-sandbox" in blob
+
+
+def test_version_skips_client(monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]) -> None:
+    monkeypatch.setattr(
+        sandbox,
+        "make_client",
+        lambda *_a, **_k: (_ for _ in ()).throw(AssertionError("version must not construct Client")),
+    )
+    with pytest.raises(SystemExit) as ei:
+        sandbox.main_with_args(["--version"])
+    assert ei.value.code == 0
+    out = capsys.readouterr().out
+    assert "1.0.0" in out
+    assert "gcp-agent-sandbox" in out
 
 
 def test_help_sandboxes_lists_required_flags(capsys: pytest.CaptureFixture[str]) -> None:

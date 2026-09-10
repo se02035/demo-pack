@@ -6,12 +6,12 @@ The host agent must still run the onboarding checklist in `SKILL.md` (ADC,
 project, location) before any API call, and apply
 [limitations.md](limitations.md).
 
-If invocation is unclear, run `python3 scripts/sandbox.py help` first (no ADC).
+If invocation is unclear, run `gcp-agent-sandbox help` first (no ADC).
 
 ## Onboarding
 
 ```
-Show me how to invoke the sandbox CLI. Run scripts/sandbox.py help. Do not call GCP yet.
+Show me how to invoke the sandbox CLI. Run gcp-agent-sandbox help. Do not call GCP yet.
 ```
 
 ```

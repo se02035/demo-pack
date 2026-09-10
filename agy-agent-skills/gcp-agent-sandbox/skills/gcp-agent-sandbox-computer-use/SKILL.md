@@ -9,10 +9,11 @@ description: >-
   (no default).
 license: Apache-2.0
 compatibility: >-
-  Python 3.10+, pip install -r ../requirements.txt
-  (google-cloud-aiplatform[agent_engines]>=2.1.0), gcloud ADC. Playwright is
-  optional (`pip install playwright && playwright install chromium`). Caller
-  needs Token Creator on --service-account. There is no gcloud sandbox CLI.
+  Python 3.10+, the gcp-agent-sandbox CLI
+  (`python3 -m pip install -e <path-to-the-suite>`), gcloud ADC. Playwright is
+  optional (`pip install 'gcp-agent-sandbox[playwright]' && playwright install
+  chromium`). Caller needs Token Creator on --service-account. There is no
+  gcloud sandbox CLI.
 metadata:
   version: "1.0"
 ---
@@ -21,9 +22,15 @@ metadata:
 
 Talk to a **RUNNING Computer Use** sandbox. Create it with
 **gcp-agent-sandbox-crud** (template `COMPUTER_USE` + `internet_access`, sandbox
-**no spec**). Read
-[../gcp-agent-sandbox-crud/references/limitations.md](../gcp-agent-sandbox-crud/references/limitations.md)
-first (CRUD-2, CRUD-6, CRUD-10, CRUD-15).
+**no spec**). Read [references/limitations.md](references/limitations.md) first
+(CRUD-2, CRUD-6, CRUD-10, CRUD-15).
+
+## CLI required
+
+1. Run `gcp-agent-sandbox help cu`, or `python3 -m gcp_agent_sandbox help cu`.
+2. If both fail, **stop**. Do not call GCP. Do not invent curl. Tell the user to
+   `python3 -m pip install -e /path/to/demo-pack/agy-agent-skills/gcp-agent-sandbox`
+   using the same Python as this harness.
 
 ## Hard rules
 
@@ -39,18 +46,20 @@ first (CRUD-2, CRUD-6, CRUD-10, CRUD-15).
   prints the URL and header **keys** only.
 
 ```bash
-python3 scripts/sandbox.py help cu
-python3 scripts/sandbox.py --project PROJECT_ID --location LOCATION \
+gcp-agent-sandbox help cu
+gcp-agent-sandbox --project PROJECT_ID --location LOCATION \
   cu health SANDBOX --engine ENGINE --service-account SERVICE_ACCOUNT_EMAIL
-python3 scripts/sandbox.py --project PROJECT_ID --location LOCATION \
+gcp-agent-sandbox --project PROJECT_ID --location LOCATION \
   cu tabs SANDBOX --engine ENGINE --service-account SERVICE_ACCOUNT_EMAIL
-python3 scripts/sandbox.py --project PROJECT_ID --location LOCATION \
+gcp-agent-sandbox --project PROJECT_ID --location LOCATION \
   cu cdp SANDBOX --engine ENGINE --service-account SERVICE_ACCOUNT_EMAIL
-python3 scripts/sandbox.py --project PROJECT_ID --location LOCATION \
+gcp-agent-sandbox --project PROJECT_ID --location LOCATION \
   cu ws SANDBOX --engine ENGINE --service-account SERVICE_ACCOUNT_EMAIL
-python3 scripts/sandbox.py --project PROJECT_ID --location LOCATION \
+gcp-agent-sandbox --project PROJECT_ID --location LOCATION \
   cu playwright SANDBOX --engine ENGINE --service-account SERVICE_ACCOUNT_EMAIL
 ```
+
+Fallback: `python3 -m gcp_agent_sandbox` with the same arguments.
 
 Playwright (US, after `cu ws` or `cu playwright`): `chromium.connect_over_cdp`
 with the websocket URL and headers from `generate_browser_ws_headers` (includes

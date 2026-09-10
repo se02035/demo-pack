@@ -9,7 +9,7 @@ When these conflict with public sandbox docs, **this file and
 
 | Id | Trigger | Actual | Workaround |
 |---|---|---|---|
-| CRUD-1 | `gcloud ai reasoning-engines` / sandbox CLI | Command group does not exist | Use `scripts/sandbox.py`. |
+| CRUD-1 | `gcloud ai reasoning-engines` / sandbox CLI | Command group does not exist | Use `gcp-agent-sandbox`. |
 | CRUD-2 | Computer Use `spec.computerUseEnvironment` | HTTP 400 `Computer Use Environment is not supported.` | Template `COMPUTER_USE` + `internetAccess: true`; sandbox template-only, no spec. |
 | CRUD-3 | URLs built only from the user project ID | Returned names use the numeric project number | `--project` = user-stated ID. Do not rewrite API names. |
 | CRUD-4 | Poll LRO until a `done` field exists | In-progress ops **omit** `done` | Missing `done` = in progress. Cap the wait. Never unbounded. |

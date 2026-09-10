@@ -11,12 +11,12 @@ agentplatform.Client(
 ```
 
 There is no `global` sandbox API. Engine, template, and sandbox must share
-`--location`. Prefer `scripts/sandbox.py` over curl (CRUD-1). Do not use
+`--location`. Prefer `gcp-agent-sandbox` over curl (CRUD-1). Do not use
 deprecated `vertexai.Client`.
 
 Known limits (read first): [limitations.md](limitations.md).
 
-Package: `google-cloud-aiplatform[agent_engines]>=2.1.0`.
+Package: `gcp-agent-sandbox` (`google-cloud-aiplatform[agent_engines]>=2.1.0`).
 
 ## Resources
 

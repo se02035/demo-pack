@@ -12,11 +12,12 @@ description: >-
   this skill to create or tear down sandboxes.
 license: Apache-2.0
 compatibility: >-
-  Requires Python 3.10+, pip install google-cloud-aiplatform[agent_engines]>=2.1.0
-  (see ../requirements.txt), Google Cloud SDK (gcloud) with Application Default
-  Credentials, and network access to {location}-aiplatform.googleapis.com.
-  Use scripts/sandbox.py (agentplatform.Client, API v1). There is no gcloud
-  sandbox CLI.
+  Requires Python 3.10+, the gcp-agent-sandbox CLI
+  (`python3 -m pip install -e <path-to-this-suite>`), Google Cloud SDK (gcloud)
+  with Application Default Credentials, and network access to
+  {location}-aiplatform.googleapis.com. Invoke `gcp-agent-sandbox` or
+  `python3 -m gcp_agent_sandbox` (agentplatform.Client, API v1). There is no
+  gcloud sandbox CLI.
 metadata:
   version: "1.0"
 ---
@@ -24,14 +25,30 @@ metadata:
 # GCP Agent Platform sandboxes (CRUD)
 
 Create and manage **sandbox environments** and **templates** on an empty Agent
-Platform instance. Prefer the bundled script over inventing curl. Public docs
-conflict with the live API — when they do, follow this skill and
+Platform instance. Prefer the **`gcp-agent-sandbox` CLI** over inventing curl.
+Public docs conflict with the live API — when they do, follow this skill and
 [references/limitations.md](references/limitations.md) (ids in
 [references/issues.md](references/issues.md)). Tell the user **before** a
 known-broken call.
 
 Do not attach smoke-test sandboxes to existing named demo agents unless the user
 names that engine. Sandboxes **bill while they exist**.
+
+## CLI required (before any API call)
+
+The CLI is a **separate pip install**, not bundled in this skill folder.
+
+1. Run `gcp-agent-sandbox help` (no ADC). If the binary is missing, run
+   `python3 -m gcp_agent_sandbox help`.
+2. If both fail, **stop**. Do not call GCP. Do not invent curl. Tell the user:
+
+```bash
+python3 -m pip install -e /path/to/demo-pack/agy-agent-skills/gcp-agent-sandbox
+# until this is on main:
+python3 -m pip install "git+https://github.com/se02035/demo-pack.git@feat/agent-sandbox-skill#subdirectory=agy-agent-skills/gcp-agent-sandbox"
+```
+
+Install into the **same Python** the harness uses to run tools.
 
 ## Known limitations (required)
 
@@ -58,27 +75,27 @@ pause, exec, or Computer Use.** Act and speak using that table. Summary:
 Collect from the user. **Do not guess** project, location, engine, or credentials.
 Do not read `gcloud config`.
 
-1. Auth — Application Default Credentials only:
+1. CLI — step above (`help` / `--version` must work).
+2. Auth — Application Default Credentials only:
    ```bash
    gcloud auth application-default login
    gcloud auth application-default set-quota-project PROJECT_ID
    ```
    Confirm with `gcloud auth application-default print-access-token >/dev/null`
    (do not print the token). Never ask for SA JSON keys or pasted tokens.
-2. `PROJECT_ID` — the GCP project **the user states**.
-3. `LOCATION` — Agent Platform region the user states (examples: `us-central1`,
+3. `PROJECT_ID` — the GCP project **the user states**.
+4. `LOCATION` — Agent Platform region the user states (examples: `us-central1`,
    `europe-west4`). No default. US and EU are separate; do not mix. If they say
    “EU” and do not name a region, ask; prefer `europe-west4` over `europe-west1`.
-4. IAM — user confirms `roles/aiplatform.user` (or equivalent). Computer Use also
+5. IAM — user confirms `roles/aiplatform.user` (or equivalent). Computer Use also
    needs Token Creator on `--service-account` (CRUD-10). Do not probe IAM unless
    they ask. Do not grant IAM.
-5. Engine — reuse a name already in this session, or the user names an existing
+6. Engine — reuse a name already in this session, or the user names an existing
    `reasoningEngines/…` resource, or asks to create a dedicated empty host.
    Never pick from `engines list` without confirmation.
 
 If project/location/ADC are missing on first use, **ask** and show the sample
-prompts below. If flags are unclear, run `python3 scripts/sandbox.py help` first
-(no ADC). Run the shim from **this skill directory**.
+prompts below. If flags are unclear, run `gcp-agent-sandbox help` first (no ADC).
 
 ## Hard rules
 
@@ -122,13 +139,13 @@ Tell the user using that file’s **Tell the user** text, then apply **Agent act
 REST/SDK shapes: [references/rest.md](references/rest.md). Exec:
 **gcp-agent-sandbox-exec**. Browser: **gcp-agent-sandbox-computer-use**.
 
-## Script
+## CLI
 
-All paths relative to this skill root.
+Prefer `gcp-agent-sandbox`. Fallback: `python3 -m gcp_agent_sandbox`.
 
 ```bash
-python3 scripts/sandbox.py help
-python3 scripts/sandbox.py --project PROJECT_ID --location LOCATION COMMAND
+gcp-agent-sandbox help
+gcp-agent-sandbox --project PROJECT_ID --location LOCATION COMMAND
 ```
 
 | Command | Purpose |
@@ -146,7 +163,7 @@ Delete order: sandboxes → templates → engine.
 
 Show these on first use. Full list: [references/prompts.md](references/prompts.md).
 
-- Show me how to invoke the sandbox CLI (`scripts/sandbox.py help`); do not call GCP yet.
+- Show me how to invoke the sandbox CLI (`gcp-agent-sandbox help`); do not call GCP yet.
 - Onboard me to Agent Platform sandboxes in project `PROJECT_ID`, location `us-central1`, using ADC.
 - Same onboarding in `europe-west4` (expect code-only; shell/CU templates fail — tell me first).
 - Create a dedicated empty sandbox-host engine, then a prebuilt shell sandbox with TTL 1h; list; delete when done.

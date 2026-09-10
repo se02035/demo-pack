@@ -44,7 +44,7 @@ template while `PROVISIONING` is not ready (HTTP 400 if you create anyway).
 
 | Id | When | Agent action | Tell the user |
 |---|---|---|---|
-| CRUD-1 | They ask for `gcloud` sandbox / reasoning-engines | Use `scripts/sandbox.py`. Do not invent gcloud. | There is no gcloud sandbox CLI. I will use this skill’s script. |
+| CRUD-1 | They ask for `gcloud` sandbox / reasoning-engines | Use `gcp-agent-sandbox` (or `python3 -m gcp_agent_sandbox`). Do not invent gcloud. | There is no gcloud sandbox CLI. I will use the gcp-agent-sandbox CLI. |
 | CRUD-2 | Computer Use create with `spec.computerUseEnvironment` | Omit spec. Template `COMPUTER_USE` + `internetAccess: true`, then sandbox from that template only. | The Computer Use spec field is rejected (400). I will use a template with internet egress and no sandbox spec. |
 | CRUD-3 | Resource name has a project **number** | Keep the API name. `--project` stays the user-stated ID. | Same project; the API prints the numeric project number in names. |
 | CRUD-4 | LRO has no `done` field | Treat as in progress. Never wait unbounded. Cap ~300s LRO + ~300s until `ACTIVE`. | Creates are async. I will poll until `done: true` or the cap; missing `done` means still running. |
@@ -86,7 +86,9 @@ default. Computer Use still requires `--service-account` from the user.
 
 ## Exec / Computer Use skills
 
-Those packages are not shipped yet. Until they are:
+Use **gcp-agent-sandbox-exec** and **gcp-agent-sandbox-computer-use**. They call
+the same `gcp-agent-sandbox` CLI (install it first; it is not bundled in the
+skill folders).
 
 - Python exec: only if you have a **RUNNING** code sandbox; decode execute
   output as UTF-8 JSON `msg_out` (not raw `model_dump`).

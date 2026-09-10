@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Agent Platform sandbox helper. argparse facade over agentplatform.Client v1."""
+"""Agent Platform sandbox CLI. argparse facade over agentplatform.Client v1."""
 
 from __future__ import annotations
 
@@ -9,6 +9,8 @@ import sys
 import time
 from dataclasses import asdict, dataclass
 from typing import Any, Callable, Literal, Sequence
+
+from gcp_agent_sandbox import __version__
 
 API_VERSION = "v1"
 DEFAULT_TTL = "3600s"
@@ -79,7 +81,7 @@ class UsageCatalog:
 
 CRUD_1 = IssueBlurb(
     id="CRUD-1",
-    workaround="There is no gcloud sandbox or reasoning-engines CLI; use this script.",
+    workaround="There is no gcloud sandbox or reasoning-engines CLI; use gcp-agent-sandbox.",
 )
 CRUD_2 = IssueBlurb(
     id="CRUD-2",
@@ -184,7 +186,7 @@ def usage_catalog() -> UsageCatalog:
                 required_flags=(),
                 optional_flags=("--command", "--format"),
                 placeholders=(),
-                example="python3 scripts/sandbox.py help",
+                example="gcp-agent-sandbox help",
                 issues=(),
             ),
             CommandHelp(
@@ -195,7 +197,7 @@ def usage_catalog() -> UsageCatalog:
                 optional_flags=("--description",),
                 placeholders=placeholders,
                 example=(
-                    "python3 scripts/sandbox.py --project PROJECT_ID --location LOCATION "
+                    "gcp-agent-sandbox --project PROJECT_ID --location LOCATION "
                     "engines create --display-name NAME"
                 ),
                 issues=issues_all,
@@ -208,7 +210,7 @@ def usage_catalog() -> UsageCatalog:
                 optional_flags=(),
                 placeholders=placeholders,
                 example=(
-                    "python3 scripts/sandbox.py --project PROJECT_ID --location LOCATION engines list"
+                    "gcp-agent-sandbox --project PROJECT_ID --location LOCATION engines list"
                 ),
                 issues=issues_all,
             ),
@@ -220,7 +222,7 @@ def usage_catalog() -> UsageCatalog:
                 optional_flags=(),
                 placeholders=placeholders,
                 example=(
-                    "python3 scripts/sandbox.py --project PROJECT_ID --location LOCATION engines get ENGINE"
+                    "gcp-agent-sandbox --project PROJECT_ID --location LOCATION engines get ENGINE"
                 ),
                 issues=issues_all,
             ),
@@ -232,7 +234,7 @@ def usage_catalog() -> UsageCatalog:
                 optional_flags=(),
                 placeholders=placeholders,
                 example=(
-                    "python3 scripts/sandbox.py --project PROJECT_ID --location LOCATION "
+                    "gcp-agent-sandbox --project PROJECT_ID --location LOCATION "
                     "engines delete ENGINE --yes"
                 ),
                 issues=issues_all,
@@ -245,7 +247,7 @@ def usage_catalog() -> UsageCatalog:
                 optional_flags=("--image", "--cpu", "--memory", "--port", "--internet-access"),
                 placeholders=placeholders,
                 example=(
-                    "python3 scripts/sandbox.py --project PROJECT_ID --location LOCATION "
+                    "gcp-agent-sandbox --project PROJECT_ID --location LOCATION "
                     "templates create --engine ENGINE --kind shell --display-name NAME"
                 ),
                 issues=issues_all + issues_eu_tpl + (CRUD_2, CRUD_7, CRUD_11),
@@ -258,7 +260,7 @@ def usage_catalog() -> UsageCatalog:
                 optional_flags=(),
                 placeholders=placeholders,
                 example=(
-                    "python3 scripts/sandbox.py --project PROJECT_ID --location LOCATION "
+                    "gcp-agent-sandbox --project PROJECT_ID --location LOCATION "
                     "templates list --engine ENGINE"
                 ),
                 issues=issues_all,
@@ -271,7 +273,7 @@ def usage_catalog() -> UsageCatalog:
                 optional_flags=("--engine",),
                 placeholders=placeholders,
                 example=(
-                    "python3 scripts/sandbox.py --project PROJECT_ID --location LOCATION "
+                    "gcp-agent-sandbox --project PROJECT_ID --location LOCATION "
                     "templates get TEMPLATE --engine ENGINE"
                 ),
                 issues=issues_all,
@@ -284,7 +286,7 @@ def usage_catalog() -> UsageCatalog:
                 optional_flags=("--engine",),
                 placeholders=placeholders,
                 example=(
-                    "python3 scripts/sandbox.py --project PROJECT_ID --location LOCATION "
+                    "gcp-agent-sandbox --project PROJECT_ID --location LOCATION "
                     "templates delete TEMPLATE --engine ENGINE --yes"
                 ),
                 issues=issues_all,
@@ -297,7 +299,7 @@ def usage_catalog() -> UsageCatalog:
                 optional_flags=("--template", "--ttl"),
                 placeholders=placeholders,
                 example=(
-                    "python3 scripts/sandbox.py --project PROJECT_ID --location LOCATION "
+                    "gcp-agent-sandbox --project PROJECT_ID --location LOCATION "
                     "sandboxes create --engine ENGINE --kind shell --display-name NAME --ttl 3600s"
                 ),
                 issues=issues_all + issues_eu_tpl + (CRUD_2, CRUD_7, CRUD_10, CRUD_11, CRUD_13),
@@ -310,7 +312,7 @@ def usage_catalog() -> UsageCatalog:
                 optional_flags=(),
                 placeholders=placeholders,
                 example=(
-                    "python3 scripts/sandbox.py --project PROJECT_ID --location LOCATION "
+                    "gcp-agent-sandbox --project PROJECT_ID --location LOCATION "
                     "sandboxes list --engine ENGINE"
                 ),
                 issues=issues_all,
@@ -323,7 +325,7 @@ def usage_catalog() -> UsageCatalog:
                 optional_flags=("--engine",),
                 placeholders=placeholders,
                 example=(
-                    "python3 scripts/sandbox.py --project PROJECT_ID --location LOCATION "
+                    "gcp-agent-sandbox --project PROJECT_ID --location LOCATION "
                     "sandboxes get SANDBOX --engine ENGINE"
                 ),
                 issues=issues_all,
@@ -336,7 +338,7 @@ def usage_catalog() -> UsageCatalog:
                 optional_flags=("--engine",),
                 placeholders=placeholders,
                 example=(
-                    "python3 scripts/sandbox.py --project PROJECT_ID --location LOCATION "
+                    "gcp-agent-sandbox --project PROJECT_ID --location LOCATION "
                     "sandboxes pause SANDBOX --engine ENGINE"
                 ),
                 issues=issues_all + (CRUD_8,),
@@ -349,7 +351,7 @@ def usage_catalog() -> UsageCatalog:
                 optional_flags=("--engine",),
                 placeholders=placeholders,
                 example=(
-                    "python3 scripts/sandbox.py --project PROJECT_ID --location LOCATION "
+                    "gcp-agent-sandbox --project PROJECT_ID --location LOCATION "
                     "sandboxes resume SANDBOX --engine ENGINE"
                 ),
                 issues=issues_all + (CRUD_8,),
@@ -362,7 +364,7 @@ def usage_catalog() -> UsageCatalog:
                 optional_flags=("--engine",),
                 placeholders=placeholders,
                 example=(
-                    "python3 scripts/sandbox.py --project PROJECT_ID --location LOCATION "
+                    "gcp-agent-sandbox --project PROJECT_ID --location LOCATION "
                     "sandboxes delete SANDBOX --engine ENGINE --yes"
                 ),
                 issues=issues_all,
@@ -375,7 +377,7 @@ def usage_catalog() -> UsageCatalog:
                 optional_flags=("--engine", "--until", "--timeout"),
                 placeholders=placeholders,
                 example=(
-                    "python3 scripts/sandbox.py --project PROJECT_ID --location LOCATION "
+                    "gcp-agent-sandbox --project PROJECT_ID --location LOCATION "
                     "sandboxes wait SANDBOX --engine ENGINE --until STATE_RUNNING"
                 ),
                 issues=issues_all,
@@ -388,7 +390,7 @@ def usage_catalog() -> UsageCatalog:
                 optional_flags=("--engine",),
                 placeholders=placeholders,
                 example=(
-                    "python3 scripts/sandbox.py --project PROJECT_ID --location LOCATION "
+                    "gcp-agent-sandbox --project PROJECT_ID --location LOCATION "
                     "exec code SANDBOX --engine ENGINE --code CODE"
                 ),
                 issues=issues_all + (CRUD_9, CRUD_13),
@@ -401,7 +403,7 @@ def usage_catalog() -> UsageCatalog:
                 optional_flags=("--engine", "--cwd"),
                 placeholders=placeholders,
                 example=(
-                    "python3 scripts/sandbox.py --project PROJECT_ID --location LOCATION "
+                    "gcp-agent-sandbox --project PROJECT_ID --location LOCATION "
                     "exec bash SANDBOX --engine ENGINE --command COMMAND"
                 ),
                 issues=issues_all + issues_eu_tpl + (CRUD_9,),
@@ -414,7 +416,7 @@ def usage_catalog() -> UsageCatalog:
                 optional_flags=("--engine",),
                 placeholders=placeholders,
                 example=(
-                    "python3 scripts/sandbox.py --project PROJECT_ID --location LOCATION "
+                    "gcp-agent-sandbox --project PROJECT_ID --location LOCATION "
                     "cu health SANDBOX --engine ENGINE --service-account SERVICE_ACCOUNT_EMAIL"
                 ),
                 issues=issues_all + issues_eu_tpl + (CRUD_5, CRUD_10),
@@ -427,7 +429,7 @@ def usage_catalog() -> UsageCatalog:
                 optional_flags=("--engine",),
                 placeholders=placeholders,
                 example=(
-                    "python3 scripts/sandbox.py --project PROJECT_ID --location LOCATION "
+                    "gcp-agent-sandbox --project PROJECT_ID --location LOCATION "
                     "cu tabs SANDBOX --engine ENGINE --service-account SERVICE_ACCOUNT_EMAIL"
                 ),
                 issues=issues_all + (CRUD_10,),
@@ -440,7 +442,7 @@ def usage_catalog() -> UsageCatalog:
                 optional_flags=("--engine", "--cdp-command", "--url"),
                 placeholders=placeholders,
                 example=(
-                    "python3 scripts/sandbox.py --project PROJECT_ID --location LOCATION "
+                    "gcp-agent-sandbox --project PROJECT_ID --location LOCATION "
                     "cu cdp SANDBOX --engine ENGINE --service-account SERVICE_ACCOUNT_EMAIL"
                 ),
                 issues=issues_all + (CRUD_10,),
@@ -453,7 +455,7 @@ def usage_catalog() -> UsageCatalog:
                 optional_flags=("--engine",),
                 placeholders=placeholders,
                 example=(
-                    "python3 scripts/sandbox.py --project PROJECT_ID --location LOCATION "
+                    "gcp-agent-sandbox --project PROJECT_ID --location LOCATION "
                     "cu ws SANDBOX --engine ENGINE --service-account SERVICE_ACCOUNT_EMAIL"
                 ),
                 issues=issues_all + (CRUD_10,),
@@ -466,7 +468,7 @@ def usage_catalog() -> UsageCatalog:
                 optional_flags=("--engine", "--url"),
                 placeholders=placeholders,
                 example=(
-                    "python3 scripts/sandbox.py --project PROJECT_ID --location LOCATION "
+                    "gcp-agent-sandbox --project PROJECT_ID --location LOCATION "
                     "cu playwright SANDBOX --engine ENGINE --service-account SERVICE_ACCOUNT_EMAIL"
                 ),
                 issues=issues_all + issues_eu_tpl + (CRUD_10,),
@@ -493,8 +495,8 @@ def make_client(project: str, location: str) -> Any:
         import agentplatform
     except ImportError as exc:
         raise SystemExit(
-            "Install google-cloud-aiplatform[agent_engines]>=2.1.0 "
-            "(pip install -r requirements.txt)."
+            "Install the gcp-agent-sandbox package "
+            "(python3 -m pip install -e <path-to-gcp-agent-sandbox>)."
         ) from exc
     return agentplatform.Client(
         project=project,
@@ -1724,7 +1726,14 @@ def build_parser() -> argparse.ArgumentParser:
     catalog = usage_catalog()
     descriptions = {item.name: item.summary for item in catalog.commands}
     parser = argparse.ArgumentParser(
-        description="Agent Platform sandbox helper (agentplatform.Client v1)."
+        prog="gcp-agent-sandbox",
+        description="Agent Platform sandbox helper (agentplatform.Client v1).",
+    )
+    parser.add_argument(
+        "--version",
+        action="version",
+        version=f"%(prog)s {__version__}",
+        help="Print package version (no GCP credentials or Client).",
     )
     parser.add_argument("--project", help="GCP project ID the user stated (no default).")
     parser.add_argument("--location", help="Agent Platform region the user stated (no default).")
