@@ -1,0 +1,28 @@
+[build-system]
+requires = ["setuptools>=69", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "gcp-agent-sandbox"
+version = "1.0.0"
+description = "CLI for Gemini Enterprise Agent Platform sandboxes (agentplatform.Client v1)."
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "google-cloud-aiplatform[agent_engines]>=2.1.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0",
+    "mypy>=1.11",
+]
+playwright = [
+    "playwright",
+]
+
+[project.scripts]
+gcp-agent-sandbox = "gcp_agent_sandbox.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]

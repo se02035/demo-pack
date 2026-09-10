@@ -1,0 +1,27 @@
+# Copy-adapt: replace acme-widgets / acme_widgets and pin the live SDK extra/version.
+
+[build-system]
+requires = ["setuptools>=69", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "acme-widgets"
+version = "1.0.0"
+description = "CLI for the Acme Widgets API."
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "REPLACE-WITH-OFFICIAL-PYTHON-SDK",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0",
+    "mypy>=1.11",
+]
+
+[project.scripts]
+acme-widgets = "acme_widgets.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
