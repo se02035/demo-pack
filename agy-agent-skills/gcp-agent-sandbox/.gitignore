@@ -1,0 +1,8 @@
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.DS_Store
+_smoke_crud.py
+_smoke_crud_log.json
+_cli_resmoke.py
