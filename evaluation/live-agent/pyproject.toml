@@ -1,0 +1,12 @@
+[project]
+name = "live-agent-validation"
+version = "0.1.0"
+description = "Local ADK live workflow demo"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "google-adk[eval]>=2.9.2",
+]
+
+[tool.uv]
+package = false
