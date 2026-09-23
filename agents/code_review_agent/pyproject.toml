@@ -1,0 +1,13 @@
+[project]
+name = "code-review-agent"
+version = "0.1.0"
+description = "Local code review agent"
+requires-python = ">=3.10"
+dependencies = [
+    "google-antigravity",
+    "python-dotenv",
+    "pydantic",
+]
+
+[tool.uv]
+package = false
