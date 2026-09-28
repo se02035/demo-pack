@@ -87,7 +87,13 @@ def _is_retryable(exc: BaseException) -> bool:
           "timeout",
           "503",
           "500",
+          "502",
           "504",
+          # A sandbox can report STATE_RUNNING a beat before its data plane
+          # accepts traffic; the control plane surfaces that as a
+          # FAILED_PRECONDITION carrying one of these phrases.
+          "bad gateway",
+          "unable to reach the sandbox",
       )
   )
 

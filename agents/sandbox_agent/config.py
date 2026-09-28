@@ -87,11 +87,18 @@ def validate_settings(settings: Settings, *, require_real_runtime: bool = False)
         f"({settings.sandbox_location!r}) does not match the location "
         f"embedded in SANDBOX_RUNTIME_NAME ({match.group('location')!r})."
     )
-  if match.group("project") != settings.project:
+  runtime_project = match.group("project")
+  # The API returns runtime names keyed by project *number*, while
+  # GOOGLE_CLOUD_PROJECT is normally a project *id*. The two cannot be compared
+  # without a Resource Manager lookup, so only reject a mismatch when both sides
+  # are the same kind of identifier.
+  if runtime_project != settings.project and (
+      runtime_project.isdigit() == settings.project.isdigit()
+  ):
     raise SandboxConfigError(
         "GOOGLE_CLOUD_PROJECT "
         f"({settings.project!r}) does not match the project "
-        f"embedded in SANDBOX_RUNTIME_NAME ({match.group('project')!r})."
+        f"embedded in SANDBOX_RUNTIME_NAME ({runtime_project!r})."
     )
   if require_real_runtime and settings.runtime_is_placeholder:
     raise SandboxConfigError(
@@ -128,7 +135,7 @@ def get_settings() -> Settings:
       idle_pause_seconds=_int_env("SANDBOX_IDLE_PAUSE_SECONDS", 600),
       idle_delete_seconds=_int_env("SANDBOX_IDLE_DELETE_SECONDS", 3600),
       display_name_prefix=_env("SANDBOX_DISPLAY_NAME_PREFIX", "adk-demo"),
-      model=_env("SANDBOX_AGENT_MODEL", "gemini-flash-latest"),
+      model=_env("SANDBOX_AGENT_MODEL", "gemini-2.5-flash"),
   )
   return validate_settings(settings, require_real_runtime=False)
 
