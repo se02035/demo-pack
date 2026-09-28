@@ -47,6 +47,16 @@ def test_sandbox_not_yet_reachable_is_retryable():
   assert _is_retryable(RuntimeError(NOT_READY)) is True
 
 
+def test_bad_gateway_request_id_containing_429_is_not_quota():
+  """Request IDs are hex; a substring 429 must not suppress retries."""
+  message = NOT_READY.replace("abc", "abc429def")
+  exc = RuntimeError(message)
+  from sandbox_agent.sandbox.client import _is_quota
+
+  assert _is_quota(exc) is False
+  assert _is_retryable(exc) is True
+
+
 def test_command_timeout_is_not_retryable():
   assert _is_retryable(RuntimeError(COMMAND_TIMEOUT)) is False
 

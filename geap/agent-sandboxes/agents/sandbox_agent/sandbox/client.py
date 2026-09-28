@@ -94,12 +94,15 @@ def _is_not_found(exc: BaseException) -> bool:
 def _is_quota(exc: BaseException) -> bool:
   text = str(exc).lower()
   name = type(exc).__name__.lower()
-  return (
+  if (
       "resource_exhausted" in name
       or "resource exhausted" in text
       or "quota" in text
-      or "429" in text
-  )
+  ):
+    return True
+  # Match the API status code only. A bare "429" also appears inside request
+  # IDs on unrelated Bad Gateway errors, and those must stay retryable.
+  return "'code': 429" in text or '"code": 429' in text
 
 
 def _is_command_timeout(exc: BaseException) -> bool:
@@ -336,11 +339,17 @@ class SandboxClient:
       timeout: int | None = None,
   ) -> dict[str, Any]:
     def _call():
+      # The SDK HTTP client has no default timeout. When the sandbox data plane
+      # never answers, the control plane can sit on the request indefinitely
+      # and this retry loop never runs. Bound the client wait to a little past
+      # the command budget (45s when the caller did not set one).
+      budget = timeout if timeout is not None else 45
       result = self._api().sandboxes.execute_bash(
           name=name,
           command=command,
           cwd=cwd,
           timeout=timeout,
+          config={"http_options": {"timeout": (budget + 25) * 1000}},
       )
       if not isinstance(result, dict):
         raise SandboxUnavailable(f"execute_bash returned unexpected type: {type(result)}")

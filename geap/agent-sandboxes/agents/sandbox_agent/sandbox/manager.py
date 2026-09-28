@@ -316,11 +316,34 @@ class SessionSandboxManager:
     return None
 
   async def _probe_ready(self, name: str) -> None:
-    """Absorb the post-create/resume Bad Gateway readiness race."""
-    try:
-      await asyncio.to_thread(self._client.execute_bash, name=name, command="true", timeout=30)
-    except Exception as exc:  # noqa: BLE001
-      logger.warning("Readiness probe failed for %s: %s", name, exc)
+    """Wait out the post-create/resume window where the data plane is not up.
+
+    The control plane can report STATE_RUNNING while execute still returns
+    500 / Bad Gateway / an empty DEADLINE_EXCEEDED. Keep probing until the
+    provision deadline instead of giving up after the client's short retry
+    burst, and fail the resolve if the sandbox never accepts a command.
+    """
+    deadline = time.monotonic() + self._settings.provision_deadline_seconds
+    last: BaseException | None = None
+    while True:
+      try:
+        await asyncio.to_thread(
+            self._client.execute_bash, name=name, command="true", timeout=20
+        )
+        return
+      except Exception as exc:  # noqa: BLE001
+        last = exc
+        remaining = deadline - time.monotonic()
+        if remaining <= 0:
+          break
+        logger.warning(
+            "Readiness probe failed for %s: %s; retrying", name, exc
+        )
+        await asyncio.sleep(min(3.0, remaining))
+    raise SandboxUnavailable(
+        f"Sandbox {name} did not accept execute_bash within "
+        f"{self._settings.provision_deadline_seconds}s: {last}"
+    )
 
   async def _wait_until_running(self, binding: SandboxBinding) -> SandboxBinding | None:
     deadline = time.monotonic() + self._settings.provision_deadline_seconds
