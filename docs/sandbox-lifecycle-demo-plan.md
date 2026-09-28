@@ -1,15 +1,11 @@
 # Plan: pause/resume, TTL and snapshot demo for the ADK sandbox agent
 
-**Status:** plan only. Builds on the shipped agent on `cursor/adk-sandbox-agent-af6c`
-(builds on the shipped agent and `docs/sandbox-learnings.md`).
+**Status:** implemented on `cursor/adk-sandbox-agent-af6c` (unit-tested). Live
+Phase 0 measurements and `pytest -m integration` for lifecycle still need a
+fresh agent run with the rotated SA secret — this authoring session still holds
+the revoked key.
 **Target:** same project `crafty-progress-421108`, sandboxes in `us-central1`,
 model `gemini-3.8-flash` at `global`.
-
-Nothing here has been run live yet. The SDK surface in §2 comes from
-introspecting `google-cloud-agentplatform==2.2.0`; every behavioural claim that
-could not be introspected is listed as a Phase 0 question in §3. The session
-that wrote this plan holds a revoked key, so live work needs a **new agent run**
-(it will pick up the rotated secret).
 
 ## 1. Goal
 

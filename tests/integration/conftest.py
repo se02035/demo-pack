@@ -54,7 +54,7 @@ def live_settings():
 
 @pytest.fixture(scope="session")
 def sandbox_reaper(live_settings):
-  """Best-effort cleanup of adk-demo sandboxes created during the session."""
+  """Best-effort cleanup of adk-demo sandboxes/snapshots created during the session."""
   import agentplatform
 
   client = agentplatform.Client(
@@ -66,6 +66,11 @@ def sandbox_reaper(live_settings):
       for s in client.sandboxes.list(name=live_settings.runtime_name)
       if (s.display_name or "").startswith(prefix)
   }
+  before_snaps = {
+      s.name
+      for s in client.sandboxes.snapshots.list(name=live_settings.runtime_name)
+      if (s.display_name or "").startswith(prefix)
+  }
   yield client
   after = list(client.sandboxes.list(name=live_settings.runtime_name))
   for sandbox in after:
@@ -75,6 +80,14 @@ def sandbox_reaper(live_settings):
         client.sandboxes.delete(name=sandbox.name)
       except Exception as exc:  # noqa: BLE001
         print(f"reaper failed for {sandbox.name}: {exc}", file=sys.stderr)
+  after_snaps = list(client.sandboxes.snapshots.list(name=live_settings.runtime_name))
+  for snap in after_snaps:
+    display = snap.display_name or ""
+    if display.startswith(prefix) and snap.name not in before_snaps:
+      try:
+        client.sandboxes.snapshots.delete(name=snap.name)
+      except Exception as exc:  # noqa: BLE001
+        print(f"snapshot reaper failed for {snap.name}: {exc}", file=sys.stderr)
 
 
 @pytest.fixture(scope="session")

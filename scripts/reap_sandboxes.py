@@ -1,14 +1,19 @@
 #!/usr/bin/env python3
-"""List or delete sandboxes whose display_name starts with a prefix.
+"""List or delete sandboxes / templates / snapshots by display-name prefix.
 
 Usage:
   python scripts/reap_sandboxes.py --list
   python scripts/reap_sandboxes.py --delete --older-than-hours 1
   python scripts/reap_sandboxes.py --templates --delete
+  python scripts/reap_sandboxes.py --snapshots --delete --older-than-hours 24
 
-Every ``sandboxes.create`` also provisions a ``shell-sandbox-template`` behind
-the scenes, and the SDK never removes it, so templates pile up one per sandbox
-ever created. ``--templates`` reaps the ones no live sandbox still references.
+Every bare ``sandboxes.create`` also provisions a ``shell-sandbox-template``
+behind the scenes (unless ``SANDBOX_TEMPLATE_NAME`` is set), and the SDK never
+removes it. ``--templates`` reaps the ones no live sandbox still references,
+keeping the pinned ``{prefix}-shell-template`` if present.
+
+``--snapshots`` reaps snapshots whose display_name starts with the prefix.
+Confirm each with ``get`` before counting — ``list`` can be stale.
 """
 
 from __future__ import annotations
@@ -54,21 +59,26 @@ def main() -> int:
       "--prefix",
       default=os.environ.get("SANDBOX_DISPLAY_NAME_PREFIX", "adk-demo"),
   )
-  parser.add_argument("--list", action="store_true", help="List matching sandboxes.")
-  parser.add_argument("--delete", action="store_true", help="Delete matching sandboxes.")
+  parser.add_argument("--list", action="store_true", help="List matching resources.")
+  parser.add_argument("--delete", action="store_true", help="Delete matching resources.")
   parser.add_argument(
       "--templates",
       action="store_true",
       help=(
           "Also act on orphaned sandbox environment templates (those no live "
-          "sandbox references). Ignores --prefix and --older-than-hours."
+          "sandbox references). Keeps the pinned {prefix}-shell-template."
       ),
+  )
+  parser.add_argument(
+      "--snapshots",
+      action="store_true",
+      help="Also act on snapshots whose display_name starts with --prefix.",
   )
   parser.add_argument(
       "--older-than-hours",
       type=float,
       default=0.0,
-      help="Only act on sandboxes older than this many hours (0 = all).",
+      help="Only act on resources older than this many hours (0 = all).",
   )
   args = parser.parse_args()
 
@@ -107,8 +117,17 @@ def main() -> int:
       client.sandboxes.delete(name=sandbox.name)
     print(f"Deleted {len(matched)} sandbox(es).")
 
+  if args.snapshots:
+    _reap_snapshots(
+        client,
+        args.runtime_name,
+        prefix=args.prefix,
+        older_than_hours=args.older_than_hours,
+        delete=args.delete,
+    )
+
   if args.templates:
-    _reap_templates(client, args.runtime_name, delete=args.delete)
+    _reap_templates(client, args.runtime_name, prefix=args.prefix, delete=args.delete)
   return 0
 
 
@@ -121,18 +140,32 @@ def _template_exists(client, name: str) -> bool:
   return True
 
 
-def _reap_templates(client, runtime_name: str, *, delete: bool) -> None:
+def _snapshot_exists(client, name: str) -> bool:
+  try:
+    client.sandboxes.snapshots.get(name=name)
+  except Exception:  # noqa: BLE001
+    return False
+  return True
+
+
+def _reap_templates(client, runtime_name: str, *, prefix: str, delete: bool) -> None:
+  pinned_display = f"{prefix}-shell-template"
+  pinned_name = os.environ.get("SANDBOX_TEMPLATE_NAME") or ""
   # Re-list: a sandbox deleted above no longer pins its template.
   in_use = {
       getattr(s, "sandbox_environment_template", None)
       for s in client.sandboxes.list(name=runtime_name)
   }
   in_use.discard(None)
-  orphaned = [
-      t
-      for t in client.sandboxes.templates.list(name=runtime_name)
-      if t.name not in in_use and _template_exists(client, t.name)
-  ]
+  orphaned = []
+  for t in client.sandboxes.templates.list(name=runtime_name):
+    if t.name in in_use:
+      continue
+    if t.name == pinned_name or (getattr(t, "display_name", None) == pinned_display):
+      continue
+    if not _template_exists(client, t.name):
+      continue
+    orphaned.append(t)
   print(f"\n{len(orphaned)} orphaned template(s), {len(in_use)} still in use.")
   if not delete:
     for template in orphaned:
@@ -145,6 +178,58 @@ def _reap_templates(client, runtime_name: str, *, delete: bool) -> None:
     except Exception as exc:  # noqa: BLE001 - keep reaping the rest
       print(f"  failed: {exc}", file=sys.stderr)
   print(f"Deleted {len(orphaned)} template(s).")
+
+
+def _reap_snapshots(
+    client,
+    runtime_name: str,
+    *,
+    prefix: str,
+    older_than_hours: float,
+    delete: bool,
+) -> None:
+  now = datetime.now(timezone.utc)
+  matched = []
+  for snap in client.sandboxes.snapshots.list(name=runtime_name):
+    display = getattr(snap, "display_name", "") or ""
+    if not display.startswith(prefix):
+      continue
+    if not _snapshot_exists(client, snap.name):
+      continue
+    created = _parse_create_time(getattr(snap, "create_time", None))
+    age_hours = (now - created).total_seconds() / 3600.0 if created else None
+    if older_than_hours > 0 and (age_hours is None or age_hours < older_than_hours):
+      continue
+    matched.append((snap, display, age_hours))
+
+  # Delete children before parents when parent_snapshot is set.
+  def _depth(item):
+    snap, _d, _a = item
+    depth = 0
+    parent = getattr(snap, "parent_snapshot", None)
+    seen = set()
+    while parent and parent not in seen:
+      seen.add(parent)
+      depth += 1
+      parent_snap = next((s for s, _, _ in matched if s.name == parent), None)
+      parent = getattr(parent_snap, "parent_snapshot", None) if parent_snap else None
+    return -depth  # higher depth (children) first
+
+  matched.sort(key=_depth)
+
+  print(f"\n{len(matched)} matching snapshot(s).")
+  if not delete:
+    for snap, display, age_hours in matched:
+      age = f"{age_hours:.2f}h" if age_hours is not None else "unknown-age"
+      print(f"{snap.name}\t{display}\t{age}\tparent={getattr(snap, 'parent_snapshot', None)}")
+    return
+  for snap, display, _age in matched:
+    print(f"Deleting snapshot {snap.name} ({display}) ...")
+    try:
+      client.sandboxes.snapshots.delete(name=snap.name)
+    except Exception as exc:  # noqa: BLE001
+      print(f"  failed: {exc}", file=sys.stderr)
+  print(f"Deleted {len(matched)} snapshot(s).")
 
 
 if __name__ == "__main__":

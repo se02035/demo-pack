@@ -48,6 +48,32 @@ def test_create_runtime_sandbox_config_fields():
   from agentplatform._genai.types import common as c
 
   fields = set(c.CreateRuntimeSandboxConfig.model_fields)
+  for key in (
+      "display_name",
+      "ttl",
+      "wait_for_completion",
+      "sandbox_environment_template",
+      "sandbox_environment_snapshot",
+  ):
+    assert key in fields
+
+
+def test_snapshots_and_templates_signatures():
+  import agentplatform
+  from agentplatform._genai.types import common as c
+
+  client = agentplatform.Client(project="p", location="us-central1")
+  snap_create = inspect.signature(client.sandboxes.snapshots.create)
+  assert "source_sandbox_environment_name" in snap_create.parameters
+  assert "config" in snap_create.parameters
+  for method in ("get", "list", "delete"):
+    assert "name" in inspect.signature(getattr(client.sandboxes.snapshots, method)).parameters
+
+  tpl_create = inspect.signature(client.sandboxes.templates.create)
+  assert "name" in tpl_create.parameters
+  assert "display_name" in tpl_create.parameters
+
+  fields = set(c.CreateRuntimeSandboxSnapshotConfig.model_fields)
   for key in ("display_name", "ttl", "wait_for_completion"):
     assert key in fields
 

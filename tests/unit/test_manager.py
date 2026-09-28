@@ -28,8 +28,9 @@ async def test_one_resolution_creates_one_sandbox(manager, fake_client):
   ctx = make_context("sandbox_agent", "u1", "s1")
   binding = await manager.resolve(ctx)
   assert fake_client.create_calls == 1
-  assert binding.name.endswith("/sandboxEnvironments/1")
+  assert "/sandboxEnvironments/" in binding.name
   assert ctx.state[STATE_SANDBOX_KEY]["name"] == binding.name
+  assert fake_client.template_create_calls == 1
 
 
 @pytest.mark.asyncio

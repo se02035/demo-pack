@@ -31,6 +31,7 @@ asyncio_default_fixture_loop_scope = "function"
 testpaths = ["tests"]
 markers = [
   "integration: live Google Cloud sandbox tests (need ADC + project)",
+  "slow: long-running live tests (TTL expiry etc.)",
 ]
 filterwarnings = [
   "ignore::DeprecationWarning",

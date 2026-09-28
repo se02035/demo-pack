@@ -31,6 +31,8 @@ class SandboxClientProtocol(Protocol):
       display_name: str,
       ttl: str,
       wait_for_completion: bool = True,
+      sandbox_environment_template: str | None = None,
+      sandbox_environment_snapshot: str | None = None,
   ) -> dict[str, Any]: ...
 
   def get(self, *, name: str) -> dict[str, Any]: ...
@@ -51,6 +53,33 @@ class SandboxClientProtocol(Protocol):
       cwd: str | None = None,
       timeout: int | None = None,
   ) -> dict[str, Any]: ...
+
+  def create_template(
+      self,
+      *,
+      runtime_name: str,
+      display_name: str,
+      wait_for_completion: bool = True,
+  ) -> dict[str, Any]: ...
+
+  def list_templates(self, *, runtime_name: str) -> list[dict[str, Any]]: ...
+
+  def get_template(self, *, name: str) -> dict[str, Any]: ...
+
+  def create_snapshot(
+      self,
+      *,
+      source_sandbox_name: str,
+      display_name: str,
+      ttl: str,
+      wait_for_completion: bool = True,
+  ) -> dict[str, Any]: ...
+
+  def get_snapshot(self, *, name: str) -> dict[str, Any]: ...
+
+  def list_snapshots(self, *, runtime_name: str) -> list[dict[str, Any]]: ...
+
+  def delete_snapshot(self, *, name: str) -> None: ...
 
 
 def _is_not_found(exc: BaseException) -> bool:
@@ -132,6 +161,34 @@ def _sandbox_to_dict(env: Any) -> dict[str, Any]:
       "update_time": str(getattr(env, "update_time", "") or ""),
       "expire_time": str(getattr(env, "expire_time", "") or ""),
       "ttl": getattr(env, "ttl", None),
+      "sandbox_environment_snapshot": getattr(env, "sandbox_environment_snapshot", None),
+      "latest_sandbox_environment_snapshot": getattr(
+          env, "latest_sandbox_environment_snapshot", None
+      ),
+      "sandbox_environment_template": getattr(env, "sandbox_environment_template", None),
+  }
+
+
+def _template_to_dict(tpl: Any) -> dict[str, Any]:
+  return {
+      "name": getattr(tpl, "name", None),
+      "display_name": getattr(tpl, "display_name", None),
+      "state": str(getattr(tpl, "state", "") or ""),
+      "create_time": str(getattr(tpl, "create_time", "") or ""),
+  }
+
+
+def _snapshot_to_dict(snap: Any) -> dict[str, Any]:
+  size = getattr(snap, "size_bytes", None)
+  return {
+      "name": getattr(snap, "name", None),
+      "display_name": getattr(snap, "display_name", None),
+      "create_time": str(getattr(snap, "create_time", "") or ""),
+      "expire_time": str(getattr(snap, "expire_time", "") or ""),
+      "ttl": getattr(snap, "ttl", None),
+      "size_bytes": int(size) if size is not None else None,
+      "source_sandbox_environment": getattr(snap, "source_sandbox_environment", None),
+      "parent_snapshot": getattr(snap, "parent_snapshot", None),
   }
 
 
@@ -187,19 +244,31 @@ class SandboxClient:
       display_name: str,
       ttl: str,
       wait_for_completion: bool = True,
+      sandbox_environment_template: str | None = None,
+      sandbox_environment_snapshot: str | None = None,
   ) -> dict[str, Any]:
     def _call():
+      config: dict[str, Any] = {
+          "display_name": display_name,
+          "ttl": ttl,
+          "wait_for_completion": wait_for_completion,
+      }
+      if sandbox_environment_template:
+        config["sandbox_environment_template"] = sandbox_environment_template
+      if sandbox_environment_snapshot:
+        config["sandbox_environment_snapshot"] = sandbox_environment_snapshot
+
+      # Restore-from-snapshot does not need a shell spec; the snapshot carries
+      # the environment. Fresh creates still use shell_environment.
+      spec = None if sandbox_environment_snapshot else {"shell_environment": {}}
+
       operation = self._api().sandboxes.create(
           name=runtime_name,
-          spec={"shell_environment": {}},
           # Creation also provisions a sandbox template and can take ~85s; the
           # SDK's 0.1s default would poll the operation several hundred times.
           poll_interval_seconds=2.0,
-          config={
-              "display_name": display_name,
-              "ttl": ttl,
-              "wait_for_completion": wait_for_completion,
-          },
+          spec=spec,
+          config=config,
       )
       env = getattr(operation, "response", None) or operation
       if env is None or not getattr(env, "name", None):
@@ -238,6 +307,7 @@ class SandboxClient:
     def _call():
       operation = self._api().sandboxes.pause(
           name=name,
+          poll_interval_seconds=2.0,
           config={"wait_for_completion": wait_for_completion},
       )
       env = getattr(operation, "response", None) or operation
@@ -249,6 +319,7 @@ class SandboxClient:
     def _call():
       operation = self._api().sandboxes.resume(
           name=name,
+          poll_interval_seconds=2.0,
           config={"wait_for_completion": wait_for_completion},
       )
       env = getattr(operation, "response", None) or operation
@@ -295,3 +366,102 @@ class SandboxClient:
           "duration_ms": None,
           "timed_out": True,
       }
+
+  def create_template(
+      self,
+      *,
+      runtime_name: str,
+      display_name: str,
+      wait_for_completion: bool = True,
+  ) -> dict[str, Any]:
+    def _call():
+      import agentplatform
+      from agentplatform._genai import types as ap_types
+
+      category = ap_types.DefaultContainerCategory.DEFAULT_CONTAINER_CATEGORY_SHELL_SANDBOX
+      default_env = ap_types.SandboxEnvironmentTemplateDefaultContainerEnvironment(
+          default_container_category=category,
+      )
+      operation = self._api().sandboxes.templates.create(
+          name=runtime_name,
+          display_name=display_name,
+          poll_interval_seconds=2.0,
+          config={
+              "wait_for_completion": wait_for_completion,
+              "default_container_environment": default_env,
+          },
+      )
+      tpl = getattr(operation, "response", None) or operation
+      if tpl is None or not getattr(tpl, "name", None):
+        # Operation may complete without embedding the resource; fetch via list.
+        for candidate in self._api().sandboxes.templates.list(name=runtime_name):
+          if getattr(candidate, "display_name", None) == display_name:
+            return _template_to_dict(candidate)
+        raise SandboxUnavailable(f"create_template returned no template: {operation!r}")
+      return _template_to_dict(tpl)
+
+    return self._retry("sandboxes.templates.create", _call)
+
+  def list_templates(self, *, runtime_name: str) -> list[dict[str, Any]]:
+    def _call():
+      return [
+          _template_to_dict(t)
+          for t in self._api().sandboxes.templates.list(name=runtime_name)
+      ]
+
+    return self._retry("sandboxes.templates.list", _call)
+
+  def get_template(self, *, name: str) -> dict[str, Any]:
+    def _call():
+      return _template_to_dict(self._api().sandboxes.templates.get(name=name))
+
+    return self._retry("sandboxes.templates.get", _call)
+
+  def create_snapshot(
+      self,
+      *,
+      source_sandbox_name: str,
+      display_name: str,
+      ttl: str,
+      wait_for_completion: bool = True,
+  ) -> dict[str, Any]:
+    def _call():
+      operation = self._api().sandboxes.snapshots.create(
+          source_sandbox_environment_name=source_sandbox_name,
+          poll_interval_seconds=2.0,
+          config={
+              "display_name": display_name,
+              "ttl": ttl,
+              "wait_for_completion": wait_for_completion,
+          },
+      )
+      snap = getattr(operation, "response", None) or operation
+      if snap is None or not getattr(snap, "name", None):
+        raise SandboxUnavailable(f"create_snapshot returned no snapshot: {operation!r}")
+      return _snapshot_to_dict(snap)
+
+    return self._retry("sandboxes.snapshots.create", _call)
+
+  def get_snapshot(self, *, name: str) -> dict[str, Any]:
+    def _call():
+      return _snapshot_to_dict(self._api().sandboxes.snapshots.get(name=name))
+
+    return self._retry("sandboxes.snapshots.get", _call)
+
+  def list_snapshots(self, *, runtime_name: str) -> list[dict[str, Any]]:
+    def _call():
+      return [
+          _snapshot_to_dict(s)
+          for s in self._api().sandboxes.snapshots.list(name=runtime_name)
+      ]
+
+    return self._retry("sandboxes.snapshots.list", _call)
+
+  def delete_snapshot(self, *, name: str) -> None:
+    def _call():
+      self._api().sandboxes.snapshots.delete(name=name)
+
+    try:
+      self._retry("sandboxes.snapshots.delete", _call)
+    except SandboxNotFound:
+      return

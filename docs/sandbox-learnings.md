@@ -124,8 +124,11 @@ Mitigations in this repo: `scripts/reap_sandboxes.py --templates` (confirm with
 `get` before counting), and `poll_interval_seconds=2.0` on create (the SDK
 default of 0.1s polls the operation hundreds of times).
 
-**Best next fix:** create one template at bootstrap, pass it into every
-`create`. That removes both the leak and most first-turn latency.
+**Best next fix (now implemented):** create one template at bootstrap
+(`scripts/bootstrap_template.py`) and set `SANDBOX_TEMPLATE_NAME`. The manager
+also auto-creates/reuses `{prefix}-shell-template` if the env var is empty.
+Restore-from-snapshot does not need a template — the SDK skips auto-provision
+when `sandbox_environment_snapshot` is set.
 
 ## 8. `STATE_RUNNING` is not "ready for execute_bash"
 

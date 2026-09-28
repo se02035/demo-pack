@@ -30,10 +30,23 @@ class Settings:
   idle_delete_seconds: int
   display_name_prefix: str
   model: str
+  template_name: str
+  snapshot_ttl_seconds: int
+  auto_snapshot_on_idle_delete: bool
+  auto_restore_on_expiry: bool
+  max_snapshots_per_session: int
 
   @property
   def ttl(self) -> str:
     return f"{self.ttl_seconds}s"
+
+  @property
+  def snapshot_ttl(self) -> str:
+    return f"{self.snapshot_ttl_seconds}s"
+
+  @property
+  def template_display_name(self) -> str:
+    return f"{self.display_name_prefix}-shell-template"
 
   @property
   def runtime_is_placeholder(self) -> bool:
@@ -63,6 +76,18 @@ def _int_env(name: str, default: int) -> int:
   if value <= 0:
     raise SandboxConfigError(f"{name} must be positive, got {value}")
   return value
+
+
+def _bool_env(name: str, default: bool) -> bool:
+  raw = os.environ.get(name)
+  if raw is None or raw.strip() == "":
+    return default
+  value = raw.strip().lower()
+  if value in {"1", "true", "yes", "on"}:
+    return True
+  if value in {"0", "false", "no", "off"}:
+    return False
+  raise SandboxConfigError(f"{name} must be a boolean, got {raw!r}")
 
 
 def validate_settings(settings: Settings, *, require_real_runtime: bool = False) -> Settings:
@@ -136,6 +161,11 @@ def get_settings() -> Settings:
       idle_delete_seconds=_int_env("SANDBOX_IDLE_DELETE_SECONDS", 3600),
       display_name_prefix=_env("SANDBOX_DISPLAY_NAME_PREFIX", "adk-demo"),
       model=_env("SANDBOX_AGENT_MODEL", "gemini-3.8-flash"),
+      template_name=_env("SANDBOX_TEMPLATE_NAME", ""),
+      snapshot_ttl_seconds=_int_env("SANDBOX_SNAPSHOT_TTL_SECONDS", 86400),
+      auto_snapshot_on_idle_delete=_bool_env("SANDBOX_AUTO_SNAPSHOT_ON_IDLE_DELETE", True),
+      auto_restore_on_expiry=_bool_env("SANDBOX_AUTO_RESTORE_ON_EXPIRY", True),
+      max_snapshots_per_session=_int_env("SANDBOX_MAX_SNAPSHOTS_PER_SESSION", 5),
   )
   return validate_settings(settings, require_real_runtime=False)
 

@@ -7,6 +7,7 @@ from typing import Any
 
 from sandbox_agent.config import get_settings
 from sandbox_agent.sandbox.errors import SandboxError
+from sandbox_agent.sandbox.manager import seconds_until_expiry
 from sandbox_agent.sandbox import runtime as sandbox_runtime
 from sandbox_agent.tools.output import error_payload, shape_bash_result
 
@@ -37,6 +38,8 @@ async def get_sandbox_info(tool_context: Any) -> dict[str, Any]:
           "state": env.get("state"),
           "create_time": env.get("create_time"),
           "expire_time": env.get("expire_time"),
+          "seconds_until_expiry": seconds_until_expiry(env.get("expire_time")),
+          "restored_from": binding.restored_from,
           "whoami_stdout": who.get("stdout") or "",
       },
   )

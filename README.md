@@ -40,11 +40,15 @@ gcloud auth application-default set-quota-project crafty-progress-421108
 
 # Create the Agent Platform runtime once (no agent deployment needed)
 python scripts/bootstrap_runtime.py
+
+# Pin one reusable shell template (avoids ~78s + a leak on every create)
+python scripts/bootstrap_template.py
 ```
 
 Copy `.env.example` to `agents/sandbox_agent/.env` and paste the printed
-`SANDBOX_RUNTIME_NAME`. Note the printed name uses the project **number**
-rather than the project id — that is expected, and config validation allows it.
+`SANDBOX_RUNTIME_NAME` and `SANDBOX_TEMPLATE_NAME`. Note the printed runtime
+name uses the project **number** rather than the project id — that is expected,
+and config validation allows it.
 
 Instead of user ADC you can authenticate with a service-account key holding
 `roles/aiplatform.user`:
@@ -69,6 +73,24 @@ Open [http://127.0.0.1:8765](http://127.0.0.1:8765), select `sandbox_agent`, and
 
 Open a second session and ask for the sandbox name again — it should differ.
 
+### Lifecycle demo (pause / snapshot / restore)
+
+In one session, try these prompts in order:
+
+1. *Show me my sandbox's lifecycle.*
+2. *Write /workspace/notes.txt with "before pause", then pause the sandbox.*
+3. *Read notes.txt.* (resumes transparently; content should survive)
+4. *Snapshot this sandbox as checkpoint-1, then delete notes.txt.*
+5. *Restore checkpoint-1 and read notes.txt.* (new sandbox name; file is back)
+6. *Show the lifecycle again.*
+
+TTL recovery: with a short `SANDBOX_TTL_SECONDS` (e.g. 180), wait past expiry
+and ask to read the file again — the agent should auto-restore from the newest
+snapshot and report `restored_from`.
+
+See [`docs/sandbox-lifecycle-demo-plan.md`](docs/sandbox-lifecycle-demo-plan.md)
+for the design.
+
 ## Run the API server (for tests / curl)
 
 ```bash
@@ -82,8 +104,11 @@ adk api_server --port 8765 --no-reload
 # Unit + SDK contract (no network)
 pytest -m "not integration"
 
-# Live isolation tests (need ADC + real SANDBOX_RUNTIME_NAME)
+# Live isolation + lifecycle tests (need ADC + real SANDBOX_RUNTIME_NAME)
 pytest -m integration
+
+# Include the slow TTL-expiry test
+pytest -m "integration and slow"
 ```
 
 ## What is actually inside the sandbox
@@ -145,24 +170,19 @@ over between `execute_bash` calls; persist state under `/workspace` instead.
 python scripts/reap_sandboxes.py --list
 python scripts/reap_sandboxes.py --delete --older-than-hours 1
 
-# Sandboxes plus the templates they leave behind (see below)
-python scripts/reap_sandboxes.py --delete --templates
+# Sandboxes + orphaned templates + stale snapshots
+python scripts/reap_sandboxes.py --delete --templates --snapshots
 ```
 
-Sandboxes also expire via the configured TTL (default 1 hour).
+Sandboxes also expire via the configured TTL (default 1 hour). Snapshots have
+their own TTL (default 24 h) and are what make idle-delete / expiry
+non-destructive when auto-restore is on.
 
-**Templates accumulate.** Every `sandboxes.create` without an explicit
-`sandbox_environment_template` makes the SDK provision a fresh
-`shell-sandbox-template` first, and nothing ever deletes it — 24 sandbox
-creations left 24 templates behind. `--templates` removes the ones no live
-sandbox still references. Provisioning that template is also most of the
-first-turn latency (~85 s of an ~90 s first turn); pinning one reusable
-template at bootstrap and passing it to `create` would remove both the leak and
-the wait, and is the obvious next improvement.
-
-Be aware that `templates.list` keeps returning templates for a while after they
-are deleted, so the reaper confirms each one with `get` before counting it.
-Trust `get`, not `list`, when checking whether cleanup worked.
+**Templates.** Prefer pinning one with `bootstrap_template.py` /
+`SANDBOX_TEMPLATE_NAME`. Without that, every create still auto-provisions a
+throwaway `shell-sandbox-template` (~78 s) that the SDK never deletes —
+`--templates` reaps those orphans while keeping the pinned
+`{prefix}-shell-template`.
 
 ## Layout
 
