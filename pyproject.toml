@@ -1,0 +1,37 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "adk-sandbox-agent"
+version = "0.1.0"
+description = "ADK v2 demo agent with one Gemini Enterprise Agent Platform shell sandbox per session"
+readme = "README.md"
+requires-python = ">=3.11,<3.14"
+dependencies = [
+  "google-adk==2.10.0",
+  "google-cloud-agentplatform==2.2.0",
+  "python-dotenv>=1.0",
+]
+
+[project.optional-dependencies]
+dev = [
+  "pytest>=8",
+  "pytest-asyncio>=0.24",
+  "httpx>=0.28",
+]
+
+[tool.setuptools.packages.find]
+where = ["agents"]
+include = ["sandbox_agent*"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
+testpaths = ["tests"]
+markers = [
+  "integration: live Google Cloud sandbox tests (need ADC + project)",
+]
+filterwarnings = [
+  "ignore::DeprecationWarning",
+]
