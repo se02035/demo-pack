@@ -27,6 +27,7 @@ def shape_bash_result(
       "returncode": int(result.get("returncode") or 0),
       "duration_ms": result.get("duration_ms"),
       "truncated": bool(stdout_truncated or stderr_truncated),
+      "timed_out": bool(result.get("timed_out")),
   }
   if extra:
     payload.update(extra)

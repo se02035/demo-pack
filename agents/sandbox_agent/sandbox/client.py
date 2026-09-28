@@ -73,10 +73,21 @@ def _is_quota(exc: BaseException) -> bool:
   )
 
 
+def _is_command_timeout(exc: BaseException) -> bool:
+  """True when the *user's* command hit its timeout, not the transport.
+
+  The control plane reports this as FAILED_PRECONDITION wrapping a
+  DEADLINE_EXCEEDED, which is otherwise indistinguishable from a transport
+  deadline. Retrying it would re-run a command that may not be idempotent.
+  """
+  text = str(exc).lower()
+  return "command exceeded" in text and "was killed" in text
+
+
 def _is_retryable(exc: BaseException) -> bool:
   text = str(exc).lower()
   name = type(exc).__name__.lower()
-  if _is_not_found(exc) or _is_quota(exc):
+  if _is_not_found(exc) or _is_quota(exc) or _is_command_timeout(exc):
     return False
   return any(
       token in text or token in name
@@ -264,6 +275,20 @@ class SandboxClient:
           "stderr": result.get("stderr") or "",
           "returncode": int(result.get("returncode") or 0),
           "duration_ms": result.get("duration_ms"),
+          "timed_out": False,
       }
 
-    return self._retry("sandboxes.execute_bash", _call)
+    try:
+      return self._retry("sandboxes.execute_bash", _call)
+    except Exception as exc:  # noqa: BLE001
+      if not _is_command_timeout(exc):
+        raise
+      # A command that outlives its timeout is data, not a failure, so the
+      # model can decide what to do. The API returns no partial output.
+      return {
+          "stdout": "",
+          "stderr": f"Command exceeded its {timeout}s timeout and was killed.",
+          "returncode": 124,
+          "duration_ms": None,
+          "timed_out": True,
+      }
