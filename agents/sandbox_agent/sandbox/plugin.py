@@ -69,7 +69,8 @@ class SandboxLifecyclePlugin(BasePlugin):
     mgr = get_manager()
     while not self._stop.is_set():
       try:
-        await mgr.pause_idle(older_than_seconds=settings.idle_pause_seconds)
+        if settings.idle_pause_seconds:
+          await mgr.pause_idle(older_than_seconds=settings.idle_pause_seconds)
         await mgr.delete_idle(older_than_seconds=settings.idle_delete_seconds)
       except Exception as exc:  # noqa: BLE001
         logger.warning("Idle reaper iteration failed: %s", exc)

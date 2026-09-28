@@ -79,6 +79,20 @@ def _int_env(name: str, default: int) -> int:
   return value
 
 
+def _int_env_allow_zero(name: str, default: int) -> int:
+  """Like ``_int_env`` but treats 0 as a valid "disabled" value."""
+  raw = os.environ.get(name)
+  if raw is None or raw.strip() == "":
+    return default
+  try:
+    value = int(raw)
+  except ValueError as exc:
+    raise SandboxConfigError(f"{name} must be an integer, got {raw!r}") from exc
+  if value < 0:
+    raise SandboxConfigError(f"{name} must be zero or positive, got {value}")
+  return value
+
+
 def _bool_env(name: str, default: bool) -> bool:
   raw = os.environ.get(name)
   if raw is None or raw.strip() == "":
@@ -162,7 +176,10 @@ def get_settings() -> Settings:
       # (23s) and for a resume that needs a second try.
       readiness_deadline_seconds=_int_env("SANDBOX_READINESS_DEADLINE_SECONDS", 120),
       max_output_chars=_int_env("SANDBOX_MAX_OUTPUT_CHARS", 20_000),
-      idle_pause_seconds=_int_env("SANDBOX_IDLE_PAUSE_SECONDS", 600),
+      # Off by default (0): a paused sandbox usually never accepts traffic
+      # again, and pausing does not slow the TTL clock, so auto-pausing an idle
+      # session costs it the sandbox and saves it nothing.
+      idle_pause_seconds=_int_env_allow_zero("SANDBOX_IDLE_PAUSE_SECONDS", 0),
       idle_delete_seconds=_int_env("SANDBOX_IDLE_DELETE_SECONDS", 3600),
       display_name_prefix=_env("SANDBOX_DISPLAY_NAME_PREFIX", "adk-demo"),
       model=_env("SANDBOX_AGENT_MODEL", "gemini-3.8-flash"),
