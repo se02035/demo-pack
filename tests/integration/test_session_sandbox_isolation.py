@@ -104,7 +104,10 @@ async def test_api_server_session_sandbox_isolation(
   s_alpha = f"s_alpha_{uuid.uuid4().hex[:6]}"
   s_beta = f"s_beta_{uuid.uuid4().hex[:6]}"
 
-  with httpx.Client(base_url=base, timeout=180.0) as http:
+  # A session's first turn pays sandbox creation, which also provisions a
+  # sandbox template; that has been measured at ~85s, and several LLM round
+  # trips sit on top of it.
+  with httpx.Client(base_url=base, timeout=420.0) as http:
     for sid in (s_alpha, s_beta):
       r = http.post(f"/apps/sandbox_agent/users/{user}/sessions/{sid}", json={})
       assert r.status_code in (200, 201), r.text

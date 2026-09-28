@@ -192,6 +192,9 @@ class SandboxClient:
       operation = self._api().sandboxes.create(
           name=runtime_name,
           spec={"shell_environment": {}},
+          # Creation also provisions a sandbox template and can take ~85s; the
+          # SDK's 0.1s default would poll the operation several hundred times.
+          poll_interval_seconds=2.0,
           config={
               "display_name": display_name,
               "ttl": ttl,
