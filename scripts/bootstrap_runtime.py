@@ -3,7 +3,7 @@
 
 Usage:
   export GOOGLE_CLOUD_PROJECT=crafty-progress-421108
-  export GOOGLE_CLOUD_LOCATION=us-central1   # model location; unused here
+  export GOOGLE_CLOUD_LOCATION=global        # model location; unused here
   export SANDBOX_LOCATION=us-central1
   python scripts/bootstrap_runtime.py
 """
