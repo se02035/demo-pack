@@ -31,6 +31,13 @@ class FakeSandboxClient:
     self.fail_snapshot_names: set[str] = set()
     self.create_hook: Callable[[], None] | None = None
     self.default_ttl_seconds = 3600
+    # Sandboxes that come up RUNNING but whose data plane never answers, the
+    # way restore-from-snapshot behaves on the live platform.
+    self.unreachable_names: set[str] = set()
+    self.unreachable_from_snapshot = False
+    # Extra states `get` yields before the sandbox's real state, so tests can
+    # drive transitions such as STATE_RESUMING.
+    self.pending_states: dict[str, list[str]] = {}
 
   def create(
       self,
@@ -76,6 +83,8 @@ class FakeSandboxClient:
           "latest_sandbox_environment_snapshot": None,
       }
       self.sandboxes[name] = env
+      if sandbox_environment_snapshot and self.unreachable_from_snapshot:
+        self.unreachable_names.add(name)
       self.call_order.append(("create", name))
       return dict(env)
 
@@ -86,7 +95,11 @@ class FakeSandboxClient:
       self.get_calls += 1
       if name in self.fail_get_names or name not in self.sandboxes:
         raise SandboxNotFound(name)
-      return dict(self.sandboxes[name])
+      env = dict(self.sandboxes[name])
+      queued = self.pending_states.get(name)
+      if queued:
+        env["state"] = queued.pop(0)
+      return env
 
   def list(self, *, runtime_name: str) -> list[dict[str, Any]]:
     with self._lock:
@@ -229,6 +242,10 @@ class FakeSandboxClient:
       env = self.sandboxes[name]
       if env.get("state") == "STATE_PAUSED":
         raise SandboxUnavailable("sandbox is paused")
+      if name in self.unreachable_names:
+        raise SandboxUnavailable(
+            "Execution Failed. Error: DEADLINE_EXCEEDED on URL .../exec"
+        )
       self.execute_calls.append(
           {"name": name, "command": command, "cwd": cwd, "timeout": timeout}
       )

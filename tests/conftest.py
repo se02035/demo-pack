@@ -27,6 +27,7 @@ def settings_env(monkeypatch: pytest.MonkeyPatch):
   monkeypatch.setenv("SANDBOX_MAX_OUTPUT_CHARS", "100")
   monkeypatch.setenv("SANDBOX_DISPLAY_NAME_PREFIX", "adk-demo")
   monkeypatch.setenv("SANDBOX_PROVISION_DEADLINE_SECONDS", "5")
+  monkeypatch.setenv("SANDBOX_READINESS_DEADLINE_SECONDS", "3")
   monkeypatch.setenv("SANDBOX_SNAPSHOT_TTL_SECONDS", "86400")
   monkeypatch.setenv("SANDBOX_AUTO_SNAPSHOT_ON_IDLE_DELETE", "true")
   monkeypatch.setenv("SANDBOX_AUTO_RESTORE_ON_EXPIRY", "true")

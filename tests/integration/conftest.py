@@ -52,42 +52,50 @@ def live_settings():
   return require_runtime_configured()
 
 
+# Display-name fragments belonging to this suite's own test users. The runtime
+# is shared, so matching the plain `adk-demo` prefix would let the reaper delete
+# a concurrent agent's sandboxes.
+_TEST_USER_MARKERS = ("iso_user-", "life_user-", "-u_iso_")
+
+
+def _owned_by_this_suite(display_name: str, prefix: str) -> bool:
+  return display_name.startswith(prefix) and any(
+      marker in display_name for marker in _TEST_USER_MARKERS
+  )
+
+
 @pytest.fixture(scope="session")
 def sandbox_reaper(live_settings):
-  """Best-effort cleanup of adk-demo sandboxes/snapshots created during the session."""
+  """Best-effort cleanup of the sandboxes/snapshots this suite created."""
   import agentplatform
 
   client = agentplatform.Client(
       project=live_settings.project, location=live_settings.sandbox_location
   )
   prefix = live_settings.display_name_prefix
-  before = {
-      s.name
-      for s in client.sandboxes.list(name=live_settings.runtime_name)
-      if (s.display_name or "").startswith(prefix)
-  }
+  before = {s.name for s in client.sandboxes.list(name=live_settings.runtime_name)}
   before_snaps = {
-      s.name
-      for s in client.sandboxes.snapshots.list(name=live_settings.runtime_name)
-      if (s.display_name or "").startswith(prefix)
+      s.name for s in client.sandboxes.snapshots.list(name=live_settings.runtime_name)
   }
   yield client
-  after = list(client.sandboxes.list(name=live_settings.runtime_name))
-  for sandbox in after:
-    display = sandbox.display_name or ""
-    if display.startswith(prefix) and sandbox.name not in before:
-      try:
-        client.sandboxes.delete(name=sandbox.name)
-      except Exception as exc:  # noqa: BLE001
-        print(f"reaper failed for {sandbox.name}: {exc}", file=sys.stderr)
-  after_snaps = list(client.sandboxes.snapshots.list(name=live_settings.runtime_name))
-  for snap in after_snaps:
-    display = snap.display_name or ""
-    if display.startswith(prefix) and snap.name not in before_snaps:
-      try:
-        client.sandboxes.snapshots.delete(name=snap.name)
-      except Exception as exc:  # noqa: BLE001
-        print(f"snapshot reaper failed for {snap.name}: {exc}", file=sys.stderr)
+  for sandbox in client.sandboxes.list(name=live_settings.runtime_name):
+    if sandbox.name in before:
+      continue
+    if not _owned_by_this_suite(sandbox.display_name or "", prefix):
+      continue
+    try:
+      client.sandboxes.delete(name=sandbox.name)
+    except Exception as exc:  # noqa: BLE001
+      print(f"reaper failed for {sandbox.name}: {exc}", file=sys.stderr)
+  for snap in client.sandboxes.snapshots.list(name=live_settings.runtime_name):
+    if snap.name in before_snaps:
+      continue
+    if not _owned_by_this_suite(snap.display_name or "", prefix):
+      continue
+    try:
+      client.sandboxes.snapshots.delete(name=snap.name)
+    except Exception as exc:  # noqa: BLE001
+      print(f"snapshot reaper failed for {snap.name}: {exc}", file=sys.stderr)
 
 
 @pytest.fixture(scope="session")
