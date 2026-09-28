@@ -9,7 +9,7 @@ restore in 9 attempts, and that one looks like gateway routing to the still-live
 source). These tests therefore assert the *safe* behaviour — a session is never
 left bound to a sandbox that cannot run a command — and keep the happy path as a
 strict-xfail so it flips green the day the platform is fixed. See
-docs/sandbox-learnings.md §15.
+docs/sandbox-learnings.md §12.
 """
 
 from __future__ import annotations

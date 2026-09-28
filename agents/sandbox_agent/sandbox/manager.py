@@ -339,8 +339,14 @@ class SessionSandboxManager:
     while True:
       attempt += 1
       try:
+        # One attempt per iteration: this loop *is* the retry, and stacking the
+        # client's own backoff on top turns a 60s budget into several minutes.
         await asyncio.to_thread(
-            self._client.execute_bash, name=name, command="true", timeout=10
+            self._client.execute_bash,
+            name=name,
+            command="true",
+            timeout=10,
+            max_retries=1,
         )
         return True
       except Exception as exc:  # noqa: BLE001

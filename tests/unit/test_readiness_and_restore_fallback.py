@@ -3,7 +3,7 @@
 Measured on `crafty-progress-421108` / `us-central1`: a restore-from-snapshot
 sandbox reports STATE_RUNNING within seconds but its data plane almost never
 answers, and the API refuses to snapshot anything that is not exactly
-STATE_RUNNING. See docs/sandbox-learnings.md §15.
+STATE_RUNNING. See docs/sandbox-learnings.md §12.
 """
 
 from __future__ import annotations

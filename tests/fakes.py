@@ -233,6 +233,7 @@ class FakeSandboxClient:
       command: str,
       cwd: str | None = None,
       timeout: int | None = None,
+      max_retries: int | None = None,
   ) -> dict[str, Any]:
     from sandbox_agent.sandbox.errors import SandboxNotFound, SandboxUnavailable
 

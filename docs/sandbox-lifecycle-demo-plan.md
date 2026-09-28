@@ -1,11 +1,25 @@
 # Plan: pause/resume, TTL and snapshot demo for the ADK sandbox agent
 
-**Status:** implemented on `cursor/adk-sandbox-agent-af6c` (unit-tested). Live
-Phase 0 measurements and `pytest -m integration` for lifecycle still need a
-fresh agent run with the rotated SA secret — this authoring session still holds
-the revoked key.
+**Status:** implemented and live-validated on `cursor/adk-sandbox-agent-af6c`.
+Phase 0 ran on 2026-09-28; results are in
+[`sandbox-learnings.md` §12](sandbox-learnings.md).
 **Target:** same project `crafty-progress-421108`, sandboxes in `us-central1`,
 model `gemini-3.8-flash` at `global`.
+
+> **Phase 0 gate tripped — the snapshot half of this plan is blocked.**
+> Pause/resume and TTL all behave well enough to demo, and snapshots themselves
+> are cheap and durable. **Restore does not work**: a sandbox created from
+> `sandbox_environment_snapshot` reports `STATE_RUNNING` but its data plane
+> never accepts a command (1 usable result in 9 attempts, and that one looks
+> like gateway routing to the still-live source). S2 is therefore unanswerable
+> and §5.3's ordering question is moot. Two of the plan's assumptions also came
+> out the other way: **`execute_bash` does not reset TTL** (§5.5) and
+> **`latest_sandbox_environment_snapshot` is never populated** (S5).
+>
+> The code ships the defensive version: restore is attempted, the result is
+> probed, and an unusable sandbox is deleted and replaced with a fresh empty one
+> rather than bound to the session. Nothing silently hands a user a dead
+> sandbox. Decisions for Oliver are in §10.
 
 ## 1. Goal
 
@@ -313,13 +327,27 @@ also delete this run's snapshots.
 
 ## 10. Needs Oliver
 
-1. **Snapshot retention default** — 24 h TTL and 5 per session reasonable?
-2. **Auto-restore on expiry default on or off?** On is the better demo; off is
-   the more conservative data posture.
-3. **If S7 forces create-then-delete**, is a brief two-sandbox overlap during
-   restore acceptable, with the invariant restated as "at most one bound
-   sandbox"?
-4. **Cross-session restore/fork** stays out unless he wants it — it is the one
+1. **Restore is a platform bug — do we file it with Google and wait, or cut the
+   snapshot half of the demo?** Everything else works; restore is the only
+   blocker, and we cannot fix it from this side. Phase 0 evidence is in
+   `sandbox-learnings.md` §12.
+2. **Should `restore_snapshot` and `list_snapshots` stay shipped as tools while
+   restore is broken?** Today `restore_snapshot` always ends in
+   `restore_unusable` plus a fresh empty sandbox, which is safe but a bad demo
+   beat. The alternative is hiding the tools behind a flag until the platform
+   is fixed.
+3. **Does the TTL finding change the demo?** Activity does *not* extend TTL, so
+   a busy session dies at exactly one hour with no warning and — because
+   restore is broken — no way to bring its files back. Options: a much longer
+   TTL, or a tool that tells the user how long they have left.
+4. **Snapshot retention default** — we set 24h explicitly; the platform default
+   is **30 days**, which is a real cost/retention footgun if anyone forgets the
+   `ttl`. Keep 24h, and 5 per session?
+5. **Cross-session restore/fork** stays out unless he wants it — it is the one
    feature here that deliberately moves data between sessions.
-5. **Run it in a new agent session** so the rotated service-account key is
-   injected.
+6. **The runtime is shared with other agents.** Phase 0 saw another session
+   creating `adk-demo-*` sandboxes on the same runtime concurrently. The test
+   reaper is now scoped to this suite's own test users, but
+   `scripts/reap_sandboxes.py --delete` still matches the bare prefix and will
+   take someone else's sandboxes with it. Worth a dedicated prefix per operator
+   if this keeps happening.

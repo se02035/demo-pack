@@ -73,23 +73,32 @@ Open [http://127.0.0.1:8765](http://127.0.0.1:8765), select `sandbox_agent`, and
 
 Open a second session and ask for the sandbox name again — it should differ.
 
-### Lifecycle demo (pause / snapshot / restore)
+### Lifecycle demo (pause / snapshot)
 
 In one session, try these prompts in order:
 
 1. *Show me my sandbox's lifecycle.*
 2. *Write /workspace/notes.txt with "before pause", then pause the sandbox.*
 3. *Read notes.txt.* (resumes transparently; content should survive)
-4. *Snapshot this sandbox as checkpoint-1, then delete notes.txt.*
-5. *Restore checkpoint-1 and read notes.txt.* (new sandbox name; file is back)
-6. *Show the lifecycle again.*
+4. *Snapshot this sandbox as checkpoint-1.*
+5. *Show the lifecycle again.*
 
-TTL recovery: with a short `SANDBOX_TTL_SECONDS` (e.g. 180), wait past expiry
-and ask to read the file again — the agent should auto-restore from the newest
-snapshot and report `restored_from`.
+**Restore does not currently work, and it is not our bug.** A sandbox created
+from a snapshot reports `STATE_RUNNING` but its data plane never accepts a
+command — measured across nine live attempts on 2026-09-28. `restore_snapshot`
+therefore deletes the old sandbox, finds the restored one unusable, deletes it
+too, and hands the session a fresh empty sandbox with
+`reason: "restore_unusable"`. The snapshot is left intact. Same story for
+auto-restore after TTL expiry: you get a working empty sandbox, never a dead
+one.
+
+Also worth knowing before you demo: **TTL is absolute**. Running commands does
+not push expiry out, and pausing does not slow the clock, so a session ends one
+hour after it started no matter how busy it is.
 
 See [`docs/sandbox-lifecycle-demo-plan.md`](docs/sandbox-lifecycle-demo-plan.md)
-for the design.
+for the design and [`docs/sandbox-learnings.md`](docs/sandbox-learnings.md) §12
+for the measurements behind all of this.
 
 ## Run the API server (for tests / curl)
 
@@ -124,8 +133,9 @@ a contract.
 | User | `appuser` (uid 999), no `sudo` binary at all |
 | Working directory | `/workspace` (writable; `/tmp` and `$HOME` also writable, `/etc` is not) |
 | Resources | 2 CPUs, 512 MB RAM, no swap |
-| Provisioning | ~10–19 s to `STATE_RUNNING` |
-| Warm `execute_bash` | ~100–200 ms round trip |
+| Provisioning | ~3 s to `STATE_RUNNING` with a pinned template |
+| Ready for commands | a further 7–23 s after that (see below) |
+| Warm `execute_bash` | 144–257 ms round trip |
 
 **Present:** `bash`, `sh`, `dash`, GNU coreutils (`ls`, `cat`, `cut`, `sort`,
 `head`, `tail`, `wc`, `tee`, `base64`, `md5sum`, `sha256sum`, `du`, `df`),
@@ -153,6 +163,11 @@ install` fails immediately for a different reason — no write access to the
 **Each command is a fresh shell.** `cd` and exported variables do not carry
 over between `execute_bash` calls; persist state under `/workspace` instead.
 
+**Background a process and you must redirect its output.** A command only
+returns once its stdout and stderr are closed, not when the foreground process
+exits. `sleep 60 &` burns the full timeout and comes back as `timed_out`;
+`sleep 60 >/dev/null 2>&1 &` returns in under half a second.
+
 ### Command failures vs. sandbox failures
 
 - A non-zero exit is returned as data (`returncode`, `stderr`), not raised.
@@ -163,6 +178,8 @@ over between `execute_bash` calls; persist state under `/workspace` instead.
   traffic; the first `execute_bash` then fails with `FAILED_PRECONDITION` /
   "Bad Gateway: Unable to reach the sandbox environment". This is retried
   automatically, so the first call in a session can take ~20 s.
+- A sandbox that *never* accepts traffic is treated as unusable rather than
+  bound to the session, so no tool call can hang on one forever.
 
 ## Cleanup
 
@@ -174,9 +191,18 @@ python scripts/reap_sandboxes.py --delete --older-than-hours 1
 python scripts/reap_sandboxes.py --delete --templates --snapshots
 ```
 
-Sandboxes also expire via the configured TTL (default 1 hour). Snapshots have
-their own TTL (default 24 h) and are what make idle-delete / expiry
-non-destructive when auto-restore is on.
+Sandboxes also expire via the configured TTL (default 1 hour). Expiry is a hard
+delete — the resource 404s within seconds of `expire_time`, with no
+`STATE_TERMINATED` in between.
+
+Snapshots need their own TTL: `SANDBOX_SNAPSHOT_TTL_SECONDS` defaults to 24 h
+here, but the **platform** default when you omit `ttl` is 30 days, so always set
+it explicitly if you call the API directly.
+
+The reaper matches on the `adk-demo` display-name prefix. If you share the
+runtime with someone else's agent, give yourself a distinct
+`SANDBOX_DISPLAY_NAME_PREFIX` first — otherwise `--delete` will take their
+sandboxes too.
 
 **Templates.** Prefer pinning one with `bootstrap_template.py` /
 `SANDBOX_TEMPLATE_NAME`. Without that, every create still auto-provisions a

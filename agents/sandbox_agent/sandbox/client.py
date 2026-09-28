@@ -52,6 +52,7 @@ class SandboxClientProtocol(Protocol):
       command: str,
       cwd: str | None = None,
       timeout: int | None = None,
+      max_retries: int | None = None,
   ) -> dict[str, Any]: ...
 
   def create_template(
@@ -217,21 +218,22 @@ class SandboxClient:
       self._client = agentplatform.Client(project=self._project, location=self._location)
     return self._client
 
-  def _retry(self, op_name: str, fn):
+  def _retry(self, op_name: str, fn, *, max_retries: int | None = None):
     last: BaseException | None = None
-    for attempt in range(self._max_retries):
+    attempts = self._max_retries if max_retries is None else max(1, max_retries)
+    for attempt in range(attempts):
       try:
         return fn()
       except Exception as exc:  # noqa: BLE001 - map everything at the boundary
         last = exc
-        if attempt + 1 >= self._max_retries or not _is_retryable(exc):
+        if attempt + 1 >= attempts or not _is_retryable(exc):
           raise _map_exception(exc) from exc
         sleep_s = (0.4 * (2**attempt)) + random.uniform(0, 0.2)
         logger.warning(
             "%s failed (attempt %s/%s): %s; retrying in %.2fs",
             op_name,
             attempt + 1,
-            self._max_retries,
+            attempts,
             exc,
             sleep_s,
         )
@@ -336,6 +338,7 @@ class SandboxClient:
       command: str,
       cwd: str | None = None,
       timeout: int | None = None,
+      max_retries: int | None = None,
   ) -> dict[str, Any]:
     # The SDK issues execute_bash over httpx with no client-side deadline, so a
     # sandbox whose data plane never answers blocks the calling thread forever
@@ -363,7 +366,7 @@ class SandboxClient:
       }
 
     try:
-      return self._retry("sandboxes.execute_bash", _call)
+      return self._retry("sandboxes.execute_bash", _call, max_retries=max_retries)
     except Exception as exc:  # noqa: BLE001
       if not _is_command_timeout(exc):
         raise
