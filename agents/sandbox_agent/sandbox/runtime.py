@@ -13,7 +13,11 @@ def get_manager() -> SessionSandboxManager:
   from sandbox_agent.config import require_runtime_configured
 
   settings = require_runtime_configured()
-  client = SandboxClient(project=settings.project, location=settings.sandbox_location)
+  client = SandboxClient(
+      project=settings.project,
+      location=settings.sandbox_location,
+      default_timeout_seconds=settings.default_timeout_seconds,
+  )
   return SessionSandboxManager(client=client, settings=settings)
 
 

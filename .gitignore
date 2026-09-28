@@ -16,3 +16,4 @@ agents/*/.adk/
 *.db
 .DS_Store
 agent-tools/
+.liveenv.sh

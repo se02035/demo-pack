@@ -23,5 +23,14 @@ class SandboxNotFound(SandboxError):
   """A sandbox resource name no longer exists."""
 
 
+class SandboxRestoreUnusable(SandboxError):
+  """A restored-from-snapshot sandbox came up but never accepted traffic.
+
+  Measured live: restore reports ``STATE_RUNNING`` within seconds but the data
+  plane usually never answers. Callers fall back to a fresh sandbox rather than
+  binding a session to one that can never run a command.
+  """
+
+
 class SandboxConfigError(SandboxError, ValueError):
   """Local configuration is invalid."""

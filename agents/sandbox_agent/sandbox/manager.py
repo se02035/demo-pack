@@ -14,6 +14,7 @@ from sandbox_agent.sandbox.client import SandboxClientProtocol
 from sandbox_agent.sandbox.errors import (
     SandboxNotFound,
     SandboxQuotaExceeded,
+    SandboxRestoreUnusable,
     SandboxUnavailable,
 )
 from sandbox_agent.sandbox.models import (
@@ -281,11 +282,17 @@ class SessionSandboxManager:
       except SandboxNotFound:
         continue
       logger.info("Auto-restoring session %s from snapshot %s", key.session_id, name)
-      return await self._create(
-          key,
-          from_snapshot=name,
-          restored_from=name,
-      )
+      try:
+        return await self._create(
+            key,
+            from_snapshot=name,
+            restored_from=name,
+        )
+      except SandboxRestoreUnusable as exc:
+        # Restore is unreliable on the platform today; an empty-but-working
+        # sandbox beats a dead one, so fall through to a plain create.
+        logger.warning("Auto-restore from %s unusable: %s", name, exc)
+        return None
     return None
 
   async def _try_reuse(self, binding: SandboxBinding) -> SandboxBinding | None:
@@ -303,24 +310,80 @@ class SessionSandboxManager:
           name=binding.name,
           wait_for_completion=True,
       )
-      await self._probe_ready(binding.name)
-      return binding
+      return binding if await self._probe_ready(binding.name) else None
     if state in {_PROVISIONING, _RESUMING}:
       recovered = await self._wait_until_running(binding)
-      if recovered is not None:
-        await self._probe_ready(binding.name)
-      return recovered
+      if recovered is None:
+        return None
+      return recovered if await self._probe_ready(binding.name) else None
     if state in _DEAD or state is None:
       return None
     logger.warning("Unrecognized sandbox state %r for %s", state, binding.name)
     return None
 
-  async def _probe_ready(self, name: str) -> None:
-    """Absorb the post-create/resume Bad Gateway readiness race."""
-    try:
-      await asyncio.to_thread(self._client.execute_bash, name=name, command="true", timeout=30)
-    except Exception as exc:  # noqa: BLE001
-      logger.warning("Readiness probe failed for %s: %s", name, exc)
+  async def _probe_ready(self, name: str, *, deadline_seconds: float | None = None) -> bool:
+    """Absorb the post-create/resume readiness race; report whether it worked.
+
+    ``STATE_RUNNING`` only means the control plane is done — the data plane can
+    still refuse traffic for ~20s after create, and a restored-from-snapshot
+    sandbox may never accept it at all. Short probes keep the common case
+    cheap; the boolean lets callers reject a sandbox that never came up.
+    """
+    budget = (
+        self._settings.readiness_deadline_seconds
+        if deadline_seconds is None
+        else deadline_seconds
+    )
+    deadline = time.monotonic() + budget
+    attempt = 0
+    while True:
+      attempt += 1
+      try:
+        await asyncio.to_thread(
+            self._client.execute_bash, name=name, command="true", timeout=10
+        )
+        return True
+      except Exception as exc:  # noqa: BLE001
+        if time.monotonic() >= deadline:
+          logger.warning(
+              "Sandbox %s never accepted traffic within %.0fs (%s attempts): %s",
+              name,
+              budget,
+              attempt,
+              exc,
+          )
+          return False
+        await asyncio.sleep(2.0)
+
+  async def _ensure_running_for_snapshot(self, name: str) -> str:
+    """Bring a sandbox to exactly ``STATE_RUNNING`` before snapshotting it.
+
+    The API rejects a snapshot of anything else ("must be in RUNNING state to
+    be snapshotted"), and `STATE_RESUMING` is easy to hit: any `execute_bash`
+    against a paused sandbox makes the platform start a resume on its own.
+    """
+    deadline = time.monotonic() + self._settings.provision_deadline_seconds
+    resumed = False
+    while True:
+      env = await asyncio.to_thread(self._client.get, name=name)
+      state = env.get("state")
+      if state == _RUNNING:
+        return state
+      if state == _PAUSED and not resumed:
+        resumed = True
+        await asyncio.to_thread(
+            self._client.resume, name=name, wait_for_completion=True
+        )
+      elif state in _DEAD or state is None:
+        raise SandboxUnavailable(
+            f"Cannot snapshot {name}: state is {state!r}"
+        )
+      if time.monotonic() >= deadline:
+        raise SandboxUnavailable(
+            f"Sandbox {name} did not reach STATE_RUNNING for snapshot "
+            f"within {self._settings.provision_deadline_seconds}s (state {state!r})"
+        )
+      await asyncio.sleep(2.0)
 
   async def _wait_until_running(self, binding: SandboxBinding) -> SandboxBinding | None:
     deadline = time.monotonic() + self._settings.provision_deadline_seconds
@@ -381,7 +444,18 @@ class SessionSandboxManager:
         raise SandboxUnavailable(f"Newly created sandbox {name} never became RUNNING")
       name = recovered.name
 
-    await self._probe_ready(name)
+    ready = await self._probe_ready(name)
+    if not ready and from_snapshot:
+      # Don't bind a session to a sandbox that can never run a command; the
+      # caller falls back to a fresh one.
+      try:
+        await asyncio.to_thread(self._client.delete, name=name)
+      except Exception as exc:  # noqa: BLE001
+        logger.warning("Failed to delete unusable restored sandbox %s: %s", name, exc)
+      raise SandboxRestoreUnusable(
+          f"Sandbox restored from {from_snapshot} reported RUNNING but never "
+          "accepted commands."
+      )
     self._create_counts[key] += 1
     return SandboxBinding(
         name=name,
@@ -480,13 +554,8 @@ class SessionSandboxManager:
       binding = self._cache.get(key) or self.read_binding(tool_context.state)
       if binding is None:
         return {"ok": False, "reason": "no_sandbox_bound"}
-      # Ensure running so the snapshot sees a consistent disk.
-      env = await asyncio.to_thread(self._client.get, name=binding.name)
-      if env.get("state") == _PAUSED:
-        await asyncio.to_thread(
-            self._client.resume, name=binding.name, wait_for_completion=True
-        )
-        await self._probe_ready(binding.name)
+      # The API only snapshots a sandbox in exactly STATE_RUNNING.
+      await self._ensure_running_for_snapshot(binding.name)
 
       display = self.snapshot_display_name(key, label)
       t0 = time.monotonic()
@@ -626,9 +695,31 @@ class SessionSandboxManager:
           tool_context.state[STATE_SANDBOX_HISTORY_KEY] = history
 
       t0 = time.monotonic()
-      created = await self._create(
-          key, from_snapshot=snap_rec.name, restored_from=snap_rec.name
-      )
+      try:
+        created = await self._create(
+            key, from_snapshot=snap_rec.name, restored_from=snap_rec.name
+        )
+      except SandboxRestoreUnusable as exc:
+        # The old sandbox is already gone, so leave the session with a working
+        # (empty) one rather than unbound or bound to something unusable.
+        fallback = await self._create(key)
+        self._cache[key] = fallback
+        self.write_binding(tool_context.state, fallback)
+        self._last_used[key] = time.monotonic()
+        return {
+            "ok": False,
+            "restored": False,
+            "reason": "restore_unusable",
+            "detail": (
+                f"{exc} The session was given a fresh empty sandbox instead; "
+                "the snapshot is still there and can be retried."
+            ),
+            "sandbox_name": fallback.name,
+            "previous_sandbox_name": old_name,
+            "snapshot_name": snap_rec.name,
+            "label": snap_rec.label,
+            "restore_seconds": round(time.monotonic() - t0, 3),
+        }
       self._cache[key] = created
       self.write_binding(tool_context.state, created)
       self._last_used[key] = time.monotonic()
@@ -719,23 +810,16 @@ class SessionSandboxManager:
       if self._settings.auto_snapshot_on_idle_delete:
         try:
           display = self.snapshot_display_name(key, f"auto-idle-{int(time.time())}")
-          # Resume if paused so the snapshot is consistent.
-          try:
-            env = await asyncio.to_thread(self._client.get, name=binding.name)
-            if env.get("state") == _PAUSED:
-              await asyncio.to_thread(
-                  self._client.resume, name=binding.name, wait_for_completion=True
-              )
-          except SandboxNotFound:
-            pass
-          else:
-            await asyncio.to_thread(
-                self._client.create_snapshot,
-                source_sandbox_name=binding.name,
-                display_name=display,
-                ttl=self._settings.snapshot_ttl,
-                wait_for_completion=True,
-            )
+          await self._ensure_running_for_snapshot(binding.name)
+          await asyncio.to_thread(
+              self._client.create_snapshot,
+              source_sandbox_name=binding.name,
+              display_name=display,
+              ttl=self._settings.snapshot_ttl,
+              wait_for_completion=True,
+          )
+        except SandboxNotFound:
+          pass
         except Exception as exc:  # noqa: BLE001
           logger.warning(
               "Auto-snapshot before idle delete failed for %s: %s", binding.name, exc

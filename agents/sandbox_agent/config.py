@@ -25,6 +25,7 @@ class Settings:
   ttl_seconds: int
   default_timeout_seconds: int
   provision_deadline_seconds: int
+  readiness_deadline_seconds: int
   max_output_chars: int
   idle_pause_seconds: int
   idle_delete_seconds: int
@@ -156,6 +157,7 @@ def get_settings() -> Settings:
       ttl_seconds=_int_env("SANDBOX_TTL_SECONDS", 3600),
       default_timeout_seconds=_int_env("SANDBOX_DEFAULT_TIMEOUT_SECONDS", 120),
       provision_deadline_seconds=_int_env("SANDBOX_PROVISION_DEADLINE_SECONDS", 180),
+      readiness_deadline_seconds=_int_env("SANDBOX_READINESS_DEADLINE_SECONDS", 60),
       max_output_chars=_int_env("SANDBOX_MAX_OUTPUT_CHARS", 20_000),
       idle_pause_seconds=_int_env("SANDBOX_IDLE_PAUSE_SECONDS", 600),
       idle_delete_seconds=_int_env("SANDBOX_IDLE_DELETE_SECONDS", 3600),

@@ -202,11 +202,13 @@ class SandboxClient:
       location: str,
       max_retries: int = 3,
       client: Any | None = None,
+      default_timeout_seconds: int = 120,
   ) -> None:
     self._project = project
     self._location = location
     self._max_retries = max_retries
     self._client = client
+    self._default_timeout = default_timeout_seconds
 
   def _api(self) -> Any:
     if self._client is None:
@@ -335,12 +337,20 @@ class SandboxClient:
       cwd: str | None = None,
       timeout: int | None = None,
   ) -> dict[str, Any]:
+    # The SDK issues execute_bash over httpx with no client-side deadline, so a
+    # sandbox whose data plane never answers blocks the calling thread forever
+    # (observed live against restore-from-snapshot sandboxes). Cap the HTTP
+    # request above the command timeout so the control plane still gets the
+    # chance to report the command's own timeout as data.
+    http_timeout_ms = int(((timeout or self._default_timeout) + 30) * 1000)
+
     def _call():
       result = self._api().sandboxes.execute_bash(
           name=name,
           command=command,
           cwd=cwd,
           timeout=timeout,
+          config={"http_options": {"timeout": http_timeout_ms}},
       )
       if not isinstance(result, dict):
         raise SandboxUnavailable(f"execute_bash returned unexpected type: {type(result)}")
