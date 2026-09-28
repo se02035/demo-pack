@@ -83,7 +83,14 @@ In one session, try these prompts in order:
 4. *Snapshot this sandbox as checkpoint-1.*
 5. *Show the lifecycle again.*
 
-**Restore does not currently work, and it is not our bug.** A sandbox created
+**Do step 3 immediately after step 2.** A sandbox woken within a couple of
+seconds of being paused comes back with its disk intact; one left paused for
+30s or more never accepts a command again, even though it reports
+`STATE_RUNNING`. That is why automatic idle pausing ships disabled
+(`SANDBOX_IDLE_PAUSE_SECONDS=0`) — it used to fire at 10 minutes and would have
+quietly destroyed any session that went quiet.
+
+**Restore does not currently work either, and it is not our bug.** A sandbox created
 from a snapshot reports `STATE_RUNNING` but its data plane never accepts a
 command — measured across nine live attempts on 2026-09-28. `restore_snapshot`
 therefore deletes the old sandbox, finds the restored one unusable, deletes it

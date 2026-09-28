@@ -244,9 +244,11 @@ argument works for a single call.
 
 - TTL at create is the crash-safe backstop; we use 1h. It cannot be extended
   later, and pausing does not slow it down (§12).
-- Idle pause after 10 minutes was observed live (a sandbox left alone showed
-  `STATE_PAUSED`). Resume from `STATE_PAUSED` only — resuming a running
-  sandbox returns `FAILED_PRECONDITION`. You rarely need an explicit resume:
+- **Do not auto-pause idle sessions.** A sandbox left paused for more than a
+  few seconds never accepts commands again (§12), so the 10-minute idle pause
+  we originally shipped is now off by default.
+- Resume from `STATE_PAUSED` only — resuming a running sandbox returns
+  `FAILED_PRECONDITION`. You rarely need an explicit resume anyway:
   `execute_bash` against a paused sandbox makes the platform start one (§12).
 - Display names like `adk-demo-<user>-<session>` are how tests and the reaper
   attribute resources. Prefer that over undocumented fields until `owner` is
@@ -270,27 +272,55 @@ row is a measurement.
 | Create → first accepted `execute_bash` | 7–23s (n=4) |
 | Warm `execute_bash` | 144–257ms |
 | `pause` (`wait_for_completion`) | 11.1–11.5s |
-| `resume` from `STATE_PAUSED` | ~7.2s |
+| `resume` from `STATE_PAUSED` | ~7.5s to return, but usually dead after |
 | `snapshots.create` | 9.5–11.5s, **independent of size** |
 | `create` from a snapshot | 7.1–8.5s (but see *Restore is broken*) |
 
 A snapshot of a near-empty `/workspace` (342 bytes) and one of a 50 MB
 `/workspace` both took ~9.5s, so snapshot time is not proportional to disk.
 
-### Pause / resume
+### Pause / resume — only safe for a few seconds
 
-- **Pause preserves the whole writable filesystem** — `/workspace`, `/tmp` and
-  `$HOME` markers all survived — **and background processes keep running**. A
-  `nohup sleep` started before the pause was still alive, by pid, afterwards.
-- **A paused sandbox is not unreachable, it is self-healing.** `execute_bash`
-  against `STATE_PAUSED` returns `503 UNAVAILABLE: Sandbox environment is
-  paused; resume has been initiated. Please retry the request.` The platform
-  starts the resume for you. That is retryable, and our client already retries
-  on `UNAVAILABLE`, so the transparent-resume path costs nothing extra.
-- Because of that auto-resume, `STATE_RESUMING` is easy to stumble into, and it
-  is **not** a state you can snapshot from (below).
-- After an explicit resume the data plane was ready immediately (first probe,
-  0.33s) — the readiness race is a create-time problem, not a resume-time one.
+**A paused sandbox does not reliably come back.** Wake it immediately and it is
+fine; leave it paused and it is gone, while still reporting `STATE_RUNNING`
+after the resume. Three sandboxes, identical except for how long they sat
+paused, each then polled for 150s:
+
+| Paused for | Came back? |
+| --- | --- |
+| 0s (woken straight away) | **yes**, ready 6.8s later, marker file intact |
+| 30s | no — 8 probes over 150s, all `DEADLINE_EXCEEDED` |
+| 120s | no — 7 probes over 150s, all `DEADLINE_EXCEEDED` |
+
+It is not about *how* you wake it. Both wake-up paths were measured separately
+against a 20s pause and both failed for 3+ minutes:
+
+- an explicit `sandboxes.resume()` — returns in ~7.5s, reports `STATE_RUNNING`;
+- letting `execute_bash` trigger the platform's own auto-resume.
+
+Nor is it about what is running inside: an idle sandbox and one with a
+background `nohup sleep` failed identically.
+
+So the pause API works — `pause` itself is reliable, ~11.2s — and the resume
+side is what is broken. Consequences for this repo:
+
+- **Automatic idle pausing is off by default** (`SANDBOX_IDLE_PAUSE_SECONDS=0`).
+  It used to fire at 10 minutes, which would have silently destroyed the
+  sandbox of every session that went quiet. It also bought nothing, because
+  pausing does not slow the TTL clock.
+- `pause_sandbox` stays available, and the manager still tries to resume, but
+  the readiness probe decides whether the sandbox actually came back; a session
+  gets a replacement rather than a dead binding.
+
+Two smaller facts worth keeping:
+
+- `execute_bash` against `STATE_PAUSED` returns `503 UNAVAILABLE: Sandbox
+  environment is paused; resume has been initiated. Please retry the request.`
+  The platform starts a resume on its own, which is why `STATE_RESUMING` shows
+  up unprompted — and that is **not** a state you can snapshot from (below).
+- When a resume does work, it preserves the whole writable filesystem
+  (`/workspace`, `/tmp`, `$HOME`) **and** running background processes: a
+  `nohup sleep` was still alive by pid afterwards.
 
 ### TTL
 

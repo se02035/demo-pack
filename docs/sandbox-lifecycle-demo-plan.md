@@ -6,9 +6,16 @@ Phase 0 ran on 2026-09-28; results are in
 **Target:** same project `crafty-progress-421108`, sandboxes in `us-central1`,
 model `gemini-3.8-flash` at `global`.
 
-> **Phase 0 gate tripped — the snapshot half of this plan is blocked.**
-> Pause/resume and TTL all behave well enough to demo, and snapshots themselves
-> are cheap and durable. **Restore does not work**: a sandbox created from
+> **Phase 0 gate tripped — the snapshot half of this plan is blocked, and
+> pause/resume is far weaker than assumed.**
+>
+> **Resume is unreliable.** A sandbox woken within a couple of seconds of being
+> paused comes back fine; one left paused for 30s or more never accepts a
+> command again, whether you call `resume` explicitly or let `execute_bash`
+> trigger the platform's auto-resume. §5.4's idle-pause step is therefore
+> destructive, and automatic idle pausing now ships disabled.
+>
+> **Restore does not work at all**: a sandbox created from
 > `sandbox_environment_snapshot` reports `STATE_RUNNING` but its data plane
 > never accepts a command (1 usable result in 9 attempts, and that one looks
 > like gateway routing to the still-live source). S2 is therefore unanswerable
@@ -340,12 +347,17 @@ also delete this run's snapshots.
    a busy session dies at exactly one hour with no warning and — because
    restore is broken — no way to bring its files back. Options: a much longer
    TTL, or a tool that tells the user how long they have left.
-4. **Snapshot retention default** — we set 24h explicitly; the platform default
+4. **Keep `pause_sandbox` as a user-facing tool?** Pausing is safe only if the
+   very next thing you do resumes it, which is not a promise we can make to a
+   model deciding when to call tools. Prospect: drop the tool and keep pause as
+   an internal step of snapshotting, or keep it with a blunt warning in the
+   response.
+5. **Snapshot retention default** — we set 24h explicitly; the platform default
    is **30 days**, which is a real cost/retention footgun if anyone forgets the
    `ttl`. Keep 24h, and 5 per session?
-5. **Cross-session restore/fork** stays out unless he wants it — it is the one
+6. **Cross-session restore/fork** stays out unless he wants it — it is the one
    feature here that deliberately moves data between sessions.
-6. **The runtime is shared with other agents.** Phase 0 saw another session
+7. **The runtime is shared with other agents.** Phase 0 saw another session
    creating `adk-demo-*` sandboxes on the same runtime concurrently. The test
    reaper is now scoped to this suite's own test users, but
    `scripts/reap_sandboxes.py --delete` still matches the bare prefix and will
