@@ -125,7 +125,7 @@ def get_settings() -> Settings:
   )
   settings = Settings(
       project=project,
-      model_location=_env("GOOGLE_CLOUD_LOCATION", "us-central1"),
+      model_location=_env("GOOGLE_CLOUD_LOCATION", "global"),
       sandbox_location=sandbox_location,
       runtime_name=_env("SANDBOX_RUNTIME_NAME", default_runtime),
       ttl_seconds=_int_env("SANDBOX_TTL_SECONDS", 3600),
@@ -135,7 +135,7 @@ def get_settings() -> Settings:
       idle_pause_seconds=_int_env("SANDBOX_IDLE_PAUSE_SECONDS", 600),
       idle_delete_seconds=_int_env("SANDBOX_IDLE_DELETE_SECONDS", 3600),
       display_name_prefix=_env("SANDBOX_DISPLAY_NAME_PREFIX", "adk-demo"),
-      model=_env("SANDBOX_AGENT_MODEL", "gemini-2.5-flash"),
+      model=_env("SANDBOX_AGENT_MODEL", "gemini-3.8-flash"),
   )
   return validate_settings(settings, require_real_runtime=False)
 

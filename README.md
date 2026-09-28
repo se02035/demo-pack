@@ -20,12 +20,11 @@ This repo is configured for:
 | --- | --- |
 | Project | `crafty-progress-421108` |
 | Sandbox region | `us-central1` (not `global`) |
-| Model | `gemini-2.5-flash` |
+| Model | `gemini-3.8-flash` at `global` |
 
-The model id matters: `gemini-flash-latest` does **not** resolve in
-`us-central1` on this project (only at `global`), so the default is pinned to
-`gemini-2.5-flash`, which does. `GOOGLE_CLOUD_LOCATION` (model) and
-`SANDBOX_LOCATION` (sandbox) are separate settings on purpose.
+`GOOGLE_CLOUD_LOCATION` (model) and `SANDBOX_LOCATION` (sandbox) are separate
+on purpose: sandboxes cannot use `global`, while `gemini-3.8-flash` is served
+from the global endpoint.
 
 ## Setup
 
