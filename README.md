@@ -166,8 +166,9 @@ Trust `get`, not `list`, when checking whether cleanup worked.
 
 ## Layout
 
-See `docs` in the project store plan, or:
-
+- [`docs/sandbox-learnings.md`](docs/sandbox-learnings.md) — how Agent Platform
+  sandboxes behave when wired into ADK (flavour choice, one-per-session,
+  templates, timeouts, image facts)
 - `agents/sandbox_agent/` — ADK agent, tools, session sandbox manager
 - `scripts/` — bootstrap runtime + reaper
 - `tests/unit/` — manager invariant + tool/SDK contract tests
