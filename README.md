@@ -50,6 +50,10 @@ Copy `.env.example` to `agents/sandbox_agent/.env` and paste the printed
 name uses the project **number** rather than the project id — that is expected,
 and config validation allows it.
 
+Pinning the template is worth the one-off ~20s: with it, `sandboxes.create`
+returns in ~3s and provisions nothing extra. Without it every create takes
+~12s and leaves a `shell-sandbox-template` behind that nothing ever deletes.
+
 Instead of user ADC you can authenticate with a service-account key holding
 `roles/aiplatform.user`:
 
@@ -117,15 +121,20 @@ adk api_server --port 8765 --no-reload
 ## Tests
 
 ```bash
-# Unit + SDK contract (no network)
+# Unit + SDK contract (no network) — 52 tests, ~30s
 pytest -m "not integration"
 
 # Live isolation + lifecycle tests (need ADC + real SANDBOX_RUNTIME_NAME)
-pytest -m integration
+pytest -m "integration and not slow"   # ~15 min
 
-# Include the slow TTL-expiry test
+# The slow TTL-expiry test on its own — ~4 min
 pytest -m "integration and slow"
 ```
+
+Two live tests are non-strict `xfail`s for platform defects we cannot fix from
+here: snapshot restore and resume-after-a-real-pause both produce a sandbox that
+reports `STATE_RUNNING` and never accepts a command. They will start passing on
+their own if Google fixes either one.
 
 ## What is actually inside the sandbox
 
