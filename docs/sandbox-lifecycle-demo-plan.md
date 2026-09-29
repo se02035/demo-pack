@@ -3,7 +3,7 @@
 **Status:** implemented and live-validated on `cursor/adk-sandbox-agent-af6c`.
 Phase 0 ran on 2026-09-28; results are in
 [`sandbox-learnings.md` §12](sandbox-learnings.md).
-**Target:** same project `crafty-progress-421108`, sandboxes in `us-central1`,
+**Target:** same project `YOUR_GCP_PROJECT`, sandboxes in `us-central1`,
 model `gemini-3.8-flash` at `global`.
 
 > **Phase 0 gate tripped — the snapshot half of this plan is blocked, and

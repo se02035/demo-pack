@@ -5,7 +5,7 @@ Every bare sandboxes.create auto-provisions a throwaway template (~78s) and
 never deletes it. Pinning one reusable template removes that cost and the leak.
 
 Usage:
-  export GOOGLE_CLOUD_PROJECT=crafty-progress-421108
+  export GOOGLE_CLOUD_PROJECT=YOUR_GCP_PROJECT
   export SANDBOX_LOCATION=us-central1
   export SANDBOX_RUNTIME_NAME=projects/.../reasoningEngines/...
   python scripts/bootstrap_template.py
@@ -22,7 +22,7 @@ def main() -> int:
   parser = argparse.ArgumentParser(description=__doc__)
   parser.add_argument(
       "--project",
-      default=os.environ.get("GOOGLE_CLOUD_PROJECT", "crafty-progress-421108"),
+      default=os.environ.get("GOOGLE_CLOUD_PROJECT", "YOUR_GCP_PROJECT"),
   )
   parser.add_argument(
       "--location",

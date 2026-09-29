@@ -1,6 +1,6 @@
 """Unit tests for behaviour the live Phase 0 run forced into the design.
 
-Measured on `crafty-progress-421108` / `us-central1`: a restore-from-snapshot
+Measured on `YOUR_GCP_PROJECT` / `us-central1`: a restore-from-snapshot
 sandbox reports STATE_RUNNING within seconds but its data plane almost never
 answers, and the API refuses to snapshot anything that is not exactly
 STATE_RUNNING. See docs/sandbox-learnings.md §12.

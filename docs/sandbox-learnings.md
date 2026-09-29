@@ -1,7 +1,7 @@
 # Learnings: Agent Platform sandboxes from ADK agents
 
 Practical notes from building and live-verifying this demo against
-`crafty-progress-421108` / `us-central1` (2026-09-28), on ADK 2.10.0 and
+`YOUR_GCP_PROJECT` / `us-central1` (2026-09-28), on ADK 2.10.0 and
 `google-cloud-agentplatform` 2.2.0. Companion to the [README](../README.md).
 How to run the agent lives there; this file is about *how sandboxes behave*
 when you wire them into an ADK agent.
@@ -97,10 +97,10 @@ This agent's defaults: model `gemini-3.8-flash` at `global`, sandbox
 `runtimes.create` returns names like:
 
 ```text
-projects/149377925365/locations/us-central1/reasoningEngines/<id>
+projects/PROJECT_NUMBER/locations/us-central1/reasoningEngines/<id>
 ```
 
-not `projects/crafty-progress-421108/...`. Comparing the embedded project
+not `projects/YOUR_GCP_PROJECT/...`. Comparing the embedded project
 segment to `GOOGLE_CLOUD_PROJECT` (usually a project *id*) rejects every real
 runtime. Only compare when both sides are the same kind of identifier, or look
 the number up via Resource Manager (needs extra IAM).
@@ -259,7 +259,7 @@ argument works for a single call.
 ## 12. Pause, TTL and snapshots, as measured
 
 Phase 0 of [`sandbox-lifecycle-demo-plan.md`](sandbox-lifecycle-demo-plan.md),
-run live on 2026-09-28 against `crafty-progress-421108` / `us-central1`. Every
+run live on 2026-09-28 against `YOUR_GCP_PROJECT` / `us-central1`. Every
 row is a measurement.
 
 ### Latency

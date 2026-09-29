@@ -2,7 +2,7 @@
 """Create a bare Agent Platform runtime and print its resource name.
 
 Usage:
-  export GOOGLE_CLOUD_PROJECT=crafty-progress-421108
+  export GOOGLE_CLOUD_PROJECT=YOUR_GCP_PROJECT
   export GOOGLE_CLOUD_LOCATION=global        # model location; unused here
   export SANDBOX_LOCATION=us-central1
   python scripts/bootstrap_runtime.py
@@ -19,7 +19,7 @@ def main() -> int:
   parser = argparse.ArgumentParser(description=__doc__)
   parser.add_argument(
       "--project",
-      default=os.environ.get("GOOGLE_CLOUD_PROJECT", "crafty-progress-421108"),
+      default=os.environ.get("GOOGLE_CLOUD_PROJECT", "YOUR_GCP_PROJECT"),
   )
   parser.add_argument(
       "--location",

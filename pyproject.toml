@@ -11,6 +11,10 @@ requires-python = ">=3.11,<3.14"
 dependencies = [
   "google-adk==2.10.0",
   "google-cloud-agentplatform==2.2.0",
+  # Plain package (not the [agent_engines] extra): that extra pulls OpenTelemetry
+  # exporters that conflict with ADK's opentelemetry-api/sdk pin. The plain
+  # install is enough for vertexai.Client used by AgentEngineSandboxCodeExecutor.
+  "google-cloud-aiplatform==2.2.0",
   "python-dotenv>=1.0",
 ]
 
@@ -23,7 +27,7 @@ dev = [
 
 [tool.setuptools.packages.find]
 where = ["agents"]
-include = ["sandbox_agent*"]
+include = ["sandbox_agent*", "code_exec_agent*"]
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"

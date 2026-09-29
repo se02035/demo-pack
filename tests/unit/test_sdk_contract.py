@@ -94,11 +94,11 @@ def test_config_rejects_global_sandbox_location(monkeypatch):
   from sandbox_agent.config import get_settings, validate_settings
   from sandbox_agent.sandbox.errors import SandboxConfigError
 
-  monkeypatch.setenv("GOOGLE_CLOUD_PROJECT", "crafty-progress-421108")
+  monkeypatch.setenv("GOOGLE_CLOUD_PROJECT", "YOUR_GCP_PROJECT")
   monkeypatch.setenv("SANDBOX_LOCATION", "global")
   monkeypatch.setenv(
       "SANDBOX_RUNTIME_NAME",
-      "projects/crafty-progress-421108/locations/global/reasoningEngines/x",
+      "projects/YOUR_GCP_PROJECT/locations/global/reasoningEngines/x",
   )
   get_settings.cache_clear()
   with pytest.raises(SandboxConfigError, match="not valid for sandboxes"):

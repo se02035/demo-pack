@@ -158,7 +158,7 @@ def get_settings() -> Settings:
   ADK agent module can import before bootstrap. Call
   ``require_runtime_configured()`` before live sandbox calls.
   """
-  project = _env("GOOGLE_CLOUD_PROJECT", "crafty-progress-421108")
+  project = _env("GOOGLE_CLOUD_PROJECT", "YOUR_GCP_PROJECT")
   sandbox_location = _env("SANDBOX_LOCATION", "us-central1")
   default_runtime = (
       f"projects/{project}/locations/{sandbox_location}/reasoningEngines/RUNTIME_ID"

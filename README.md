@@ -1,11 +1,15 @@
-# ADK v2 shell-sandbox demo agent
+# ADK v2 sandbox demo agents
 
-Local Agent Development Kit (ADK) v2 agent that gives each conversation session
-its own Gemini Enterprise Agent Platform **shell sandbox**. The agent can report
-the sandbox identity, run bash commands, list directories, and read/write text
-files. Python code execution is intentionally out of scope.
+Two local Agent Development Kit (ADK) v2 agents that each give a conversation
+session its own Gemini Enterprise Agent Platform sandbox:
 
-Hard invariant: **exactly one sandbox per ADK session**, never shared.
+| Agent | Sandbox flavour | How isolation is enforced |
+| --- | --- | --- |
+| `sandbox_agent` | **Shell** (`execute_bash`) | Custom `SessionSandboxManager` |
+| `code_exec_agent` | **Code Execution** (`execute_code`) | ADK's `AgentEngineSandboxCodeExecutor` |
+
+Hard invariant for both: **exactly one sandbox per ADK session**, never shared
+across sessions.
 
 ## Prerequisites
 
@@ -14,12 +18,13 @@ Hard invariant: **exactly one sandbox per ADK session**, never shared.
 - Application Default Credentials and the **Agent Platform User** role
   (`roles/aiplatform.user`)
 
-This repo is configured for:
+Typical local settings (replace with your own project; nothing project-specific
+is checked into this repo):
 
-| Setting | Value |
+| Setting | Example |
 | --- | --- |
-| Project | `crafty-progress-421108` |
-| Sandbox region | `us-central1` (not `global`) |
+| Project | your GCP project id (`GOOGLE_CLOUD_PROJECT`) |
+| Sandbox region | a real region such as `us-central1` (not `global`) |
 | Model | `gemini-3.8-flash` at `global` |
 
 `GOOGLE_CLOUD_LOCATION` (model) and `SANDBOX_LOCATION` (sandbox) are separate
@@ -33,24 +38,27 @@ python3 -m venv .venv
 source .venv/bin/activate
 pip install -e ".[dev]"
 
-gcloud config set project crafty-progress-421108
+export GOOGLE_CLOUD_PROJECT=YOUR_GCP_PROJECT
+gcloud config set project "$GOOGLE_CLOUD_PROJECT"
 gcloud services enable aiplatform.googleapis.com
 gcloud auth application-default login
-gcloud auth application-default set-quota-project crafty-progress-421108
+gcloud auth application-default set-quota-project "$GOOGLE_CLOUD_PROJECT"
 
 # Create the Agent Platform runtime once (no agent deployment needed)
 python scripts/bootstrap_runtime.py
 
-# Pin one reusable shell template (avoids ~78s + a leak on every create)
+# Shell agent only: pin one reusable shell template (avoids extra provision + leak)
 python scripts/bootstrap_template.py
 ```
 
-Copy `.env.example` to `agents/sandbox_agent/.env` and paste the printed
-`SANDBOX_RUNTIME_NAME` and `SANDBOX_TEMPLATE_NAME`. Note the printed runtime
-name uses the project **number** rather than the project id — that is expected,
-and config validation allows it.
+Copy [`.env.example`](.env.example) to `agents/sandbox_agent/.env` and
+[`agents/code_exec_agent/.env.example`](agents/code_exec_agent/.env.example) to
+`agents/code_exec_agent/.env`. Paste the printed `SANDBOX_RUNTIME_NAME` (and
+for the shell agent, `SANDBOX_TEMPLATE_NAME`). The printed runtime name often
+uses the project **number** rather than the project id — that is expected, and
+config validation allows it.
 
-Pinning the template is worth the one-off ~20s: with it, `sandboxes.create`
+Pinning a shell template is worth the one-off ~20s: with it, `sandboxes.create`
 returns in ~3s and provisions nothing extra. Without it every create takes
 ~12s and leaves a `shell-sandbox-template` behind that nothing ever deletes.
 
@@ -69,13 +77,28 @@ cd agents
 adk web --port 8765 --no-reload
 ```
 
-Open [http://127.0.0.1:8765](http://127.0.0.1:8765), select `sandbox_agent`, and try:
+Open [http://127.0.0.1:8765](http://127.0.0.1:8765).
+
+### Shell agent (`sandbox_agent`)
+
+Select `sandbox_agent`, and try:
 
 > Which sandbox am I in, and what user am I running as? Then create
 > /workspace/notes.txt containing "hello from the playground", read it back,
 > list /workspace, and show disk usage and the kernel version.
 
 Open a second session and ask for the sandbox name again — it should differ.
+
+### Code Execution agent (`code_exec_agent`)
+
+Select `code_exec_agent` (prefer `--session_service_uri memory://` for a clean
+local demo). Full walkthrough, including how to read
+`_code_execution_context.sandbox_name` from the State tab and a scripted
+proof: [`docs/code-exec-session-isolation.md`](docs/code-exec-session-isolation.md).
+
+```bash
+python scripts/prove_code_exec_isolation.py
+```
 
 ### Lifecycle demo (pause / snapshot)
 
@@ -233,7 +256,10 @@ throwaway `shell-sandbox-template` (~78 s) that the SDK never deletes —
   templates, timeouts, image facts)
 - [`docs/sandbox-lifecycle-demo-plan.md`](docs/sandbox-lifecycle-demo-plan.md) —
   plan for a deeper pause/resume, TTL and snapshot demo
-- `agents/sandbox_agent/` — ADK agent, tools, session sandbox manager
-- `scripts/` — bootstrap runtime + reaper
+- [`docs/code-exec-session-isolation.md`](docs/code-exec-session-isolation.md) —
+  Code Execution agent + proof that sessions get distinct sandboxes
+- `agents/sandbox_agent/` — Shell ADK agent, tools, session sandbox manager
+- `agents/code_exec_agent/` — Code Execution ADK agent (built-in executor)
+- `scripts/` — bootstrap runtime / template, reaper, code-exec isolation proof
 - `tests/unit/` — manager invariant + tool/SDK contract tests
 - `tests/integration/` — api_server + live one-sandbox-per-session proof

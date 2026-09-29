@@ -44,7 +44,7 @@ def main() -> int:
   parser = argparse.ArgumentParser(description=__doc__)
   parser.add_argument(
       "--project",
-      default=os.environ.get("GOOGLE_CLOUD_PROJECT", "crafty-progress-421108"),
+      default=os.environ.get("GOOGLE_CLOUD_PROJECT", "YOUR_GCP_PROJECT"),
   )
   parser.add_argument(
       "--location",

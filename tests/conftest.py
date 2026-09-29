@@ -16,12 +16,12 @@ if str(AGENTS) not in sys.path:
 
 @pytest.fixture
 def settings_env(monkeypatch: pytest.MonkeyPatch):
-  monkeypatch.setenv("GOOGLE_CLOUD_PROJECT", "crafty-progress-421108")
+  monkeypatch.setenv("GOOGLE_CLOUD_PROJECT", "YOUR_GCP_PROJECT")
   monkeypatch.setenv("GOOGLE_CLOUD_LOCATION", "us-central1")
   monkeypatch.setenv("SANDBOX_LOCATION", "us-central1")
   monkeypatch.setenv(
       "SANDBOX_RUNTIME_NAME",
-      "projects/crafty-progress-421108/locations/us-central1/reasoningEngines/test-runtime",
+      "projects/YOUR_GCP_PROJECT/locations/us-central1/reasoningEngines/test-runtime",
   )
   monkeypatch.setenv("SANDBOX_TTL_SECONDS", "3600")
   monkeypatch.setenv("SANDBOX_MAX_OUTPUT_CHARS", "100")
