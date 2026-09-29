@@ -162,3 +162,35 @@ async def test_create_raises_restore_unusable_rather_than_binding_it(
 
   with pytest.raises(SandboxRestoreUnusable):
     await manager._create(key, from_snapshot=snap["snapshot_name"])
+
+
+@pytest.mark.asyncio
+async def test_failed_resume_deletes_old_sandbox_before_replace(
+    manager, fake_client
+):
+  """A paused sandbox whose data plane never wakes must not leave two live
+  sandboxes for the session when resolve falls back to a fresh create."""
+  from sandbox_agent.sandbox.models import STATE_SANDBOX_HISTORY_KEY
+
+  ctx = _ctx("s_resume_dead")
+  binding = await manager.resolve(ctx)
+  await manager.pause_session(ctx)
+  fake_client.unreachable_names.add(binding.name)
+
+  recovered = await manager.resolve(ctx)
+
+  assert recovered.name != binding.name
+  assert binding.name not in fake_client.sandboxes
+  assert recovered.name in fake_client.sandboxes
+  assert ctx.state[STATE_SANDBOX_HISTORY_KEY] == [binding.name]
+  # delete(old) must precede create(new)
+  delete_idxs = [
+      i for i, (op, name) in enumerate(fake_client.call_order)
+      if op == "delete" and name == binding.name
+  ]
+  create_idxs = [
+      i for i, (op, name) in enumerate(fake_client.call_order)
+      if op == "create" and name == recovered.name
+  ]
+  assert delete_idxs and create_idxs
+  assert delete_idxs[0] < create_idxs[0]

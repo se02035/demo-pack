@@ -235,6 +235,32 @@ class SessionSandboxManager:
           self._last_used[key] = time.monotonic()
           return recovered
         logger.info("Sandbox %s is not reusable; replacing", binding.name)
+        # Delete the dead/unusable sandbox *before* creating a replacement.
+        # Otherwise a failed resume (common platform defect) leaves two live
+        # sandboxes with the same display name and breaks the one-per-session
+        # invariant until TTL or the reaper catches up.
+        self._cache.pop(key, None)
+        try:
+          await asyncio.to_thread(self._client.delete, name=binding.name)
+        except SandboxNotFound:
+          pass
+        except Exception as exc:  # noqa: BLE001
+          logger.warning(
+              "Failed to delete unusable sandbox %s during replace: %s",
+              binding.name,
+              exc,
+          )
+        self.clear_binding(tool_context.state)
+        history: list[str] = []
+        if hasattr(tool_context.state, "get"):
+          hist_raw = tool_context.state.get(STATE_SANDBOX_HISTORY_KEY) or []
+        else:
+          hist_raw = []
+        if isinstance(hist_raw, list):
+          history = list(hist_raw)
+        history.append(binding.name)
+        tool_context.state[STATE_SANDBOX_HISTORY_KEY] = history
+
         if self._settings.auto_restore_on_expiry:
           restored = await self._try_auto_restore(tool_context, key)
           if restored is not None:
