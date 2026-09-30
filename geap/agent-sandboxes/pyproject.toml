@@ -23,7 +23,7 @@ dev = [
 
 [tool.setuptools.packages.find]
 where = ["agents"]
-include = ["sandbox_agent*"]
+include = ["sandbox_agent*", "env_sandbox_agent*"]
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"

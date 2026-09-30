@@ -192,6 +192,9 @@ throwaway `shell-sandbox-template` (~78 s) that the SDK never deletes —
 - [`docs/sandbox-lifecycle-demo-plan.md`](docs/sandbox-lifecycle-demo-plan.md) —
   plan for a deeper pause/resume, TTL and snapshot demo
 - `agents/sandbox_agent/` — ADK agent, tools, session sandbox manager
+- `agents/env_sandbox_agent/` — thinner EnvironmentToolset + custom
+  `BaseEnvironment` demo (one shell + one code sandbox per session); see its
+  [README](agents/env_sandbox_agent/README.md)
 - `scripts/` — bootstrap runtime + reaper
 - `tests/unit/` — manager invariant + tool/SDK contract tests
 - `tests/integration/` — api_server + live one-sandbox-per-session proof
